@@ -51,9 +51,20 @@ RailSight AI Architecture
     └── Floating Real-Time Event Injection Bar (Rain, Congestion, Speed Restriction, Priority)
 ```
 
----
+## 📡 5-Part SIH Data Integration Pipeline
 
-## 📊 Machine Learning Model Benchmarks
+1. **Historical Train Running & Delay Data**:
+   - Primary: Ingestion adapter for Kaggle *Indian Railway Delay Dataset* (`vishwassrivastava1/indian-railway-delay-dataset`).
+   - Sourced from public dataset combined with live `pyinrail` / NTES enquiry query fallback.
+2. **Route + Station Sequence**:
+   - `data.gov.in` timetables & GeoJSON route segments (`anandology/railways`).
+3. **Station Master + Coordinates**:
+   - GeoJSON FeatureCollection (`backend/data/stations.json`) mapping exact station coordinates (Lat/Lng), zone (`NR`, `ER`, `WR`, `NCR`, `ECR`), state, and address.
+4. **Historical Weather Data**:
+   - Direct integration with **Open-Meteo Free Historical Weather API** (`backend/data/fetch_open_meteo_weather.py`). Plugs station master coordinates directly into Open-Meteo REST endpoints for station-wise rainfall and temperature.
+5. **Derived Delay Features**:
+   - Leakage-free groupby aggregations calculated strictly on training splits (`backend/data/derived_features.py`): `train_avg_delay`, `station_avg_delay`, `route_avg_delay`, `hour_avg_delay`.
+
 
 Evaluation performed on engineered Indian Railways train tracking datasets:
 

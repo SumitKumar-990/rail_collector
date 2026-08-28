@@ -77,8 +77,11 @@ export function useLiveTrainData() {
               return {
                 ...t,
                 aiPredictedEta: etaRes.aiPredictedEta,
+                remainingTravelTimeMinutes: etaRes.remainingTravelTimeMinutes,
                 delayMinutes: etaRes.delayMinutes,
                 confidenceScore: etaRes.confidenceScore,
+                dataQuality: etaRes.dataQuality,
+                dataSourceTransparency: etaRes.dataSourceTransparency,
                 delayFactors: explanationRes.delayFactors.length > 0 ? explanationRes.delayFactors : t.delayFactors,
                 lastUpdated: 'Just now'
               };

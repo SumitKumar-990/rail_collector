@@ -10,7 +10,6 @@ export type NavPage =
 
 export type TrainStatus = 'on_time' | 'delayed' | 'critical' | 'approaching';
 
-
 export interface StationStop {
   id: string;
   stationName: string;
@@ -28,11 +27,25 @@ export interface StationStop {
 export interface DelayFactor {
   id: string;
   name: string;
-  category: 'congestion' | 'signal' | 'weather' | 'speed_restriction' | 'recovery' | 'maintenance';
+  category: 'congestion' | 'signal' | 'weather' | 'speed_restriction' | 'recovery' | 'maintenance' | 'current_delay' | 'route_history' | 'normal';
   impactMinutes: number; // positive for delay, negative for recovery
   type: 'delay' | 'gain';
   icon: string;
   description: string;
+  source?: string;
+}
+
+export interface DataSourceTransparency {
+  is_live_gps: boolean;
+  is_estimated: boolean;
+  is_simulated: boolean;
+  model_type: string;
+}
+
+export interface DataQualityScore {
+  score: number; // 0.0 - 1.0
+  estimated_telemetry: boolean;
+  weather_available: boolean;
 }
 
 export interface Train {
@@ -56,10 +69,13 @@ export interface Train {
   scheduledEta: string; // HH:MM
   traditionalEta: string; // HH:MM
   aiPredictedEta: string; // HH:MM
+  remainingTravelTimeMinutes?: number;
   delayMinutes: number;
   status: TrainStatus;
   confidenceScore: number; // percentage (e.g. 96)
-  lat: number; // For map SVG position (0-100 scale or geographic)
+  dataQuality?: DataQualityScore;
+  dataSourceTransparency?: DataSourceTransparency;
+  lat: number;
   lng: number;
   timeline: StationStop[];
   delayFactors: DelayFactor[];

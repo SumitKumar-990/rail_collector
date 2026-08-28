@@ -1,0 +1,85 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [77.2090, 28.6139] },
+      "properties": { "code": "NDLS", "name": "New Delhi", "zone": "NR", "state": "Delhi", "address": "Paharganj, New Delhi" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [80.3319, 26.4499] },
+      "properties": { "code": "CNB", "name": "Kanpur Central", "zone": "NCR", "state": "Uttar Pradesh", "address": "Cantonment, Kanpur" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [81.8463, 25.4358] },
+      "properties": { "code": "PRYJ", "name": "Prayagraj Junction", "zone": "NCR", "state": "Uttar Pradesh", "address": "Civil Lines, Prayagraj" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [83.1147, 25.2819] },
+      "properties": { "code": "DDU", "name": "Pt DD Upadhyaya Junction", "zone": "ECR", "state": "Uttar Pradesh", "address": "Mughalsarai" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [84.9994, 24.7955] },
+      "properties": { "code": "GAYA", "name": "Gaya Junction", "zone": "ECR", "state": "Bihar", "address": "Station Road, Gaya" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [86.4304, 23.7957] },
+      "properties": { "code": "DHN", "name": "Dhanbad Junction", "zone": "ECR", "state": "Jharkhand", "address": "Bank More, Dhanbad" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [88.3426, 22.5851] },
+      "properties": { "code": "HWH", "name": "Howrah Junction", "zone": "ER", "state": "West Bengal", "address": "Howrah, Kolkata" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [72.8194, 18.9696] },
+      "properties": { "code": "MMCT", "name": "Mumbai Central", "zone": "WR", "state": "Maharashtra", "address": "Tardeo, Mumbai" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [72.8311, 21.2049] },
+      "properties": { "code": "ST", "name": "Surat", "zone": "WR", "state": "Gujarat", "address": "Varachha, Surat" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [73.1812, 22.3107] },
+      "properties": { "code": "BRC", "name": "Vadodara Junction", "zone": "WR", "state": "Gujarat", "address": "Sayajiganj, Vadodara" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [75.8648, 25.2138] },
+      "properties": { "code": "KOTA", "name": "Kota Junction", "zone": "WCR", "state": "Rajasthan", "address": "Bhimganj Mandi, Kota" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [77.4262, 23.2294] },
+      "properties": { "code": "RKMP", "name": "Rani Kamlapati (Bhopal)", "zone": "WCR", "state": "Madhya Pradesh", "address": "Habibganj, Bhopal" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [79.0882, 21.1458] },
+      "properties": { "code": "NGP", "name": "Nagpur Junction", "zone": "CR", "state": "Maharashtra", "address": "Sitabuldi, Nagpur" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [77.9946, 27.1593] },
+      "properties": { "code": "AGC", "name": "Agra Cantt", "zone": "NCR", "state": "Uttar Pradesh", "address": "Idgah, Agra" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [88.3712, 22.5675] },
+      "properties": { "code": "SDAH", "name": "Sealdah", "zone": "ER", "state": "West Bengal", "address": "Sealdah, Kolkata" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [82.9972, 25.3176] },
+      "properties": { "code": "BSB", "name": "Varanasi Junction", "zone": "NR", "state": "Uttar Pradesh", "address": "Cantonment, Varanasi" }
+    }
+  ]
+}

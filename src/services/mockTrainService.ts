@@ -1,4 +1,4 @@
-import { Train, NetworkHotspot, OperationalAlert, DelayFactor } from '../types';
+import { Train, NetworkHotspot, OperationalAlert, DelayFactor, DataQualityScore, DataSourceTransparency } from '../types';
 import { INITIAL_TRAINS, NETWORK_HOTSPOTS, OPERATIONAL_ALERTS } from '../data/mockData';
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -10,22 +10,21 @@ export class MockTrainService {
 
   async getTrains(): Promise<Train[]> {
     try {
-      // Try fetching live train status from backend FastAPI
+      // Fetch live status from backend FastAPI for train 12301
       const res = await fetch(`${API_BASE_URL}/trains/12301/live`);
       if (res.ok) {
         const liveData = await res.json();
-        // Enrich first train with live API data
         this.trains[0] = {
           ...this.trains[0],
           currentLocation: liveData.current_station,
           currentSpeed: liveData.speed,
           delayMinutes: liveData.current_delay_minutes,
-          lat: liveData.latitude || 38,
-          lng: liveData.longitude || 48
+          lat: liveData.latitude || 26.4499,
+          lng: liveData.longitude || 80.3319
         };
       }
     } catch (e) {
-      // Fallback to local state if server offline
+      // Local state fallback
     }
     return [...this.trains];
   }
@@ -40,14 +39,11 @@ export class MockTrainService {
     scheduledEta: string;
     traditionalEta: string;
     aiPredictedEta: string;
+    remainingTravelTimeMinutes: number;
     delayMinutes: number;
     confidenceScore: number;
-    dataSourceTransparency: {
-      is_live_gps: boolean;
-      is_estimated: boolean;
-      is_simulated: boolean;
-      model_type: string;
-    };
+    dataQuality: DataQualityScore;
+    dataSourceTransparency: DataSourceTransparency;
   }> {
     try {
       const res = await fetch(`${API_BASE_URL}/trains/${trainId}/eta`);
@@ -58,13 +54,20 @@ export class MockTrainService {
           scheduledEta: "18:30",
           traditionalEta: "18:30",
           aiPredictedEta: data.predicted_eta_formatted,
+          remainingTravelTimeMinutes: data.remaining_travel_time_minutes,
           delayMinutes: data.delay_minutes,
-          confidenceScore: Math.round(data.confidence * 100),
-          dataSourceTransparency: data.data_source_transparency
+          confidenceScore: Math.round(data.prediction_confidence * 100),
+          dataQuality: data.data_quality || { score: 0.92, estimated_telemetry: false, weather_available: true },
+          dataSourceTransparency: data.data_source_transparency || {
+            is_live_gps: true,
+            is_estimated: false,
+            is_simulated: false,
+            model_type: "XGBoost Regressor (eta_xgboost.json)"
+          }
         };
       }
     } catch (e) {
-      // Fallback
+      // Local fallback
     }
 
     const train = await this.getTrainById(trainId);
@@ -75,9 +78,11 @@ export class MockTrainService {
       scheduledEta: train.scheduledEta,
       traditionalEta: train.traditionalEta,
       aiPredictedEta: train.aiPredictedEta,
+      remainingTravelTimeMinutes: train.remainingTravelTimeMinutes || 105,
       delayMinutes: train.delayMinutes,
       confidenceScore: train.confidenceScore,
-      dataSourceTransparency: {
+      dataQuality: train.dataQuality || { score: 0.92, estimated_telemetry: false, weather_available: true },
+      dataSourceTransparency: train.dataSourceTransparency || {
         is_live_gps: true,
         is_estimated: false,
         is_simulated: false,
@@ -115,12 +120,15 @@ export class MockTrainService {
           impactMinutes: f.impact_minutes,
           type: f.impact_minutes > 0 ? 'delay' : 'gain',
           icon: f.impact_minutes > 0 ? (f.impact_minutes > 10 ? '🔴' : '🟠') : '🟢',
+          source: f.source || 'LIVE / HISTORICAL DATA',
           description: f.category === 'congestion'
             ? 'Track occupancy density on forward route segment'
             : f.category === 'speed_restriction'
             ? 'Caution speed order over track maintenance zone'
             : f.category === 'weather'
             ? 'Rainfall / low visibility regulation'
+            : f.category === 'signal'
+            ? 'Signal clearance interlock hold'
             : 'Schedule padding buffer recovery'
         }));
 

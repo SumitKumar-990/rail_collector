@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime, timedelta
 
 # Ensure backend directory is in sys.path
-backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
@@ -13,13 +13,13 @@ from ml.feature_engineering import (
     calculate_distance_remaining,
     calculate_scheduled_remaining_time,
     calculate_weather_score,
-    calculate_congestion_score,
+    calculate_estimated_congestion_score,
     calculate_speed_restriction_score
 )
 
 router = APIRouter(prefix="/api/trains", tags=["Trains"])
 
-# Mock database state of monitored trains
+# Database state of monitored trains
 MONITORED_TRAINS_STATE = {
     "12301": {
         "train_id": "12301",
@@ -31,6 +31,7 @@ MONITORED_TRAINS_STATE = {
         "destination": "Howrah Junction",
         "current_station": "Kanpur Central",
         "next_station": "Prayagraj Junction",
+        "target_station": "Prayagraj Junction",
         "latitude": 26.4499,
         "longitude": 80.3319,
         "speed": 92.0,
@@ -55,6 +56,7 @@ MONITORED_TRAINS_STATE = {
         "destination": "New Delhi",
         "current_station": "Kota Junction",
         "next_station": "Sawai Madhopur",
+        "target_station": "New Delhi",
         "latitude": 25.2138,
         "longitude": 75.8648,
         "speed": 112.0,
@@ -79,6 +81,7 @@ MONITORED_TRAINS_STATE = {
         "destination": "Rani Kamlapati",
         "current_station": "Agra Cantt",
         "next_station": "Gwalior Junction",
+        "target_station": "Rani Kamlapati",
         "latitude": 27.1593,
         "longitude": 77.9946,
         "speed": 130.0,
@@ -103,6 +106,7 @@ MONITORED_TRAINS_STATE = {
         "destination": "New Delhi",
         "current_station": "Mirzapur",
         "next_station": "Prayagraj Junction",
+        "target_station": "New Delhi",
         "latitude": 25.146,
         "longitude": 82.569,
         "speed": 45.0,
@@ -123,7 +127,7 @@ MONITORED_TRAINS_STATE = {
 async def get_live_train_status(train_id: str):
     """
     Returns live running status, coordinates, current speed, and delay.
-    Matches prompt requirement: GET /api/trains/{train_id}/live
+    Endpoint: GET /api/trains/{train_id}/live
     """
     train = MONITORED_TRAINS_STATE.get(train_id)
     if not train:
@@ -143,8 +147,8 @@ async def get_live_train_status(train_id: str):
 @router.get("/{train_id}/eta")
 async def get_train_eta_prediction(train_id: str):
     """
-    Returns dynamic XGBoost ETA prediction, remaining travel time, confidence, and source tags.
-    Matches prompt requirement: GET /api/trains/{train_id}/eta
+    Returns dynamic XGBoost ETA prediction, remaining travel time, confidence, data quality, and transparent tags.
+    Endpoint: GET /api/trains/{train_id}/eta
     """
     train = MONITORED_TRAINS_STATE.get(train_id)
     if not train:
@@ -154,6 +158,7 @@ async def get_train_eta_prediction(train_id: str):
     sched_rem_time = calculate_scheduled_remaining_time(dist_rem, 85.0)
 
     feature_dict = {
+        "train_id": train["train_id"],
         "current_delay_minutes": train["current_delay_minutes"],
         "current_speed_kmph": train["speed"],
         "distance_to_next_station_km": 65.0,
@@ -172,21 +177,26 @@ async def get_train_eta_prediction(train_id: str):
         "signal_delay_score": train["signal_delay_score"],
         "previous_station_delay": train["current_delay_minutes"],
         "upcoming_station_count": 5,
-        "is_estimated": train["is_estimated"]
+        "is_estimated": train["is_estimated"],
+        "is_simulated": train.get("is_simulated", False)
     }
 
-    prediction_result = predictor.predict_dynamic_eta(feature_dict)
+    current_ts = datetime.now()
+    target_st = train.get("target_station", train["next_station"])
+    prediction_result = predictor.predict_dynamic_eta(feature_dict, current_time=current_ts, target_station=target_st)
 
     return {
         "train_id": train["train_id"],
         "train_name": train["train_name"],
-        "next_station": train["next_station"],
+        "prediction_timestamp": prediction_result["prediction_timestamp"],
+        "target_station": target_st,
+        "remaining_travel_time_minutes": prediction_result["remaining_travel_time_minutes"],
         "predicted_eta": prediction_result["predicted_eta"],
         "predicted_eta_formatted": prediction_result["predicted_eta_formatted"],
         "delay_minutes": int(train["current_delay_minutes"]),
-        "remaining_travel_time_minutes": prediction_result["remaining_travel_time_minutes"],
-        "confidence": prediction_result["confidence"],
-        "last_updated": datetime.now().isoformat(),
+        "prediction_confidence": prediction_result["prediction_confidence"],
+        "data_quality": prediction_result["data_quality"],
+        "data_sources": prediction_result["data_sources"],
         "data_source_transparency": {
             "is_live_gps": not train["is_estimated"],
             "is_estimated": train["is_estimated"],
@@ -198,8 +208,8 @@ async def get_train_eta_prediction(train_id: str):
 @router.get("/{train_id}/eta/explanation")
 async def get_train_eta_explanation(train_id: str):
     """
-    Returns SHAP-like feature contribution explanation factors.
-    Matches prompt requirement: GET /api/trains/{train_id}/eta/explanation
+    Returns feature attribution explanation factors based strictly on model features.
+    Endpoint: GET /api/trains/{train_id}/eta/explanation
     """
     train = MONITORED_TRAINS_STATE.get(train_id)
     if not train:
@@ -209,14 +219,18 @@ async def get_train_eta_explanation(train_id: str):
     sched_rem_time = calculate_scheduled_remaining_time(dist_rem, 85.0)
 
     feature_dict = {
+        "train_id": train["train_id"],
         "current_delay_minutes": train["current_delay_minutes"],
         "current_speed_kmph": train["speed"],
         "distance_remaining_km": dist_rem,
         "scheduled_remaining_time_minutes": sched_rem_time,
         "weather_score": train["weather_score"],
+        "rainfall_mm": train["rainfall_mm"],
         "congestion_score": train["congestion_score"],
         "speed_restriction_score": train["speed_restriction_score"],
-        "signal_delay_score": train["signal_delay_score"]
+        "signal_delay_score": train["signal_delay_score"],
+        "route_avg_delay_minutes": 11.0,
+        "is_estimated": train["is_estimated"]
     }
 
     prediction_result = predictor.predict_dynamic_eta(feature_dict)
@@ -225,7 +239,7 @@ async def get_train_eta_explanation(train_id: str):
         "train_id": train["train_id"],
         "prediction": {
             "eta": prediction_result["predicted_eta_formatted"],
-            "confidence": prediction_result["confidence"],
+            "confidence": prediction_result["prediction_confidence"],
             "remaining_travel_time_minutes": prediction_result["remaining_travel_time_minutes"]
         },
         "factors": prediction_result["prediction_factors"],

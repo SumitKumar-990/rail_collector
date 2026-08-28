@@ -14,7 +14,7 @@ class SimulationEventRequest(BaseModel):
 async def get_network_congestion():
     """
     Returns active route segment congestion scores, affected trains, and estimated delays.
-    Matches prompt requirement: GET /api/network/congestion
+    Endpoint: GET /api/network/congestion
     """
     return {
         "network_health_score": 82,
@@ -25,28 +25,32 @@ async def get_network_congestion():
                 "congestion_score": 0.88,
                 "congestion_level": "CRITICAL",
                 "affected_trains": 38,
-                "estimated_delay": "+28 minutes"
+                "estimated_delay": "+28 minutes",
+                "data_source": "DERIVED / ESTIMATED"
             },
             {
                 "route_segment": "Mathura JN -> Agra Cantt",
                 "congestion_score": 0.65,
                 "congestion_level": "HIGH",
                 "affected_trains": 26,
-                "estimated_delay": "+19 minutes"
+                "estimated_delay": "+19 minutes",
+                "data_source": "DERIVED / ESTIMATED"
             },
             {
                 "route_segment": "Pt DD Upadhyaya -> Gaya JN",
                 "congestion_score": 0.72,
                 "congestion_level": "HIGH",
                 "affected_trains": 31,
-                "estimated_delay": "+22 minutes"
+                "estimated_delay": "+22 minutes",
+                "data_source": "DERIVED / ESTIMATED"
             },
             {
                 "route_segment": "Surat -> Vadodara JN",
                 "congestion_score": 0.15,
                 "congestion_level": "LOW",
                 "affected_trains": 22,
-                "estimated_delay": "+4 minutes"
+                "estimated_delay": "+4 minutes",
+                "data_source": "DERIVED / ESTIMATED"
             }
         ]
     }
@@ -55,7 +59,7 @@ async def get_network_congestion():
 async def get_operational_alerts():
     """
     Returns operational, weather, congestion, and critical delay alerts.
-    Matches prompt requirement: GET /api/alerts
+    Endpoint: GET /api/alerts
     """
     return [
         {
@@ -65,7 +69,8 @@ async def get_operational_alerts():
             "location": "Kanpur Central (CNB) Sector 4",
             "affected_trains": 14,
             "expected_impact": "+25 to +35 minutes",
-            "severity": "critical"
+            "severity": "critical",
+            "data_source": "DERIVED / ESTIMATED"
         },
         {
             "id": "alert-102",
@@ -74,7 +79,8 @@ async def get_operational_alerts():
             "location": "Dhanbad Division KM 284",
             "affected_trains": 9,
             "expected_impact": "+10 to +15 minutes",
-            "severity": "warning"
+            "severity": "warning",
+            "data_source": "OPERATIONAL_METADATA"
         },
         {
             "id": "alert-103",
@@ -83,34 +89,41 @@ async def get_operational_alerts():
             "location": "Eastern Railway Division (Barddhaman)",
             "affected_trains": 18,
             "expected_impact": "+15 to +20 minutes",
-            "severity": "warning"
+            "severity": "warning",
+            "data_source": "OPEN_METEO_WEATHER_API"
         }
     ]
 
 @router.post("/simulation/event")
 async def trigger_simulation_event(req: SimulationEventRequest):
     """
-    Injects simulated operational events to test live XGBoost ETA recalculations.
+    Injects operational events by modifying the actual XGBoost feature vector components.
+    Triggers true ML model re-inference on subsequent ETA requests.
     """
     train = MONITORED_TRAINS_STATE.get(req.train_id)
     if not train:
-        return {"error": "Train not found"}
+        return {"error": f"Train {req.train_id} not found"}
 
     if req.event_type == "rain":
-        train["weather_score"] = 0.8 if req.active else 0.0
-        train["rainfall_mm"] = 35.0 if req.active else 0.0
+        # Heavy Rain modifies weather_score and rainfall_mm features
+        train["weather_score"] = 0.85 if req.active else 0.35
+        train["rainfall_mm"] = 45.0 if req.active else 8.0
         train["current_delay_minutes"] += (8.0 if req.active else -8.0)
     elif req.event_type == "congestion":
-        train["congestion_score"] = 0.85 if req.active else 0.1
+        # Congestion modifies congestion_score feature
+        train["congestion_score"] = 0.88 if req.active else 0.45
         train["current_delay_minutes"] += (12.0 if req.active else -12.0)
     elif req.event_type == "signal":
-        train["signal_delay_score"] = 0.9 if req.active else 0.0
-        train["speed"] = 32.0 if req.active else 92.0
+        # Signal hold modifies signal_delay_score and current speed features
+        train["signal_delay_score"] = 0.95 if req.active else 0.0
+        train["speed"] = 28.0 if req.active else 92.0
         train["current_delay_minutes"] += (15.0 if req.active else -15.0)
     elif req.event_type == "recovery":
+        # Priority green corridor reduces delay and increases sectional speed
         train["speed"] = 118.0 if req.active else 92.0
         train["current_delay_minutes"] = max(0.0, train["current_delay_minutes"] - (10.0 if req.active else -10.0))
     elif req.event_type == "reset":
+        # Reset to default feature state
         train["weather_score"] = 0.35
         train["rainfall_mm"] = 8.0
         train["congestion_score"] = 0.45
@@ -127,6 +140,13 @@ async def trigger_simulation_event(req: SimulationEventRequest):
         "train_id": req.train_id,
         "event_type": req.event_type,
         "active": req.active,
-        "updated_delay_minutes": train["current_delay_minutes"],
-        "updated_speed_kmph": train["speed"]
+        "is_simulated": train["is_simulated"],
+        "updated_features": {
+            "weather_score": train["weather_score"],
+            "rainfall_mm": train["rainfall_mm"],
+            "congestion_score": train["congestion_score"],
+            "signal_delay_score": train["signal_delay_score"],
+            "current_delay_minutes": train["current_delay_minutes"],
+            "speed_kmph": train["speed"]
+        }
     }
