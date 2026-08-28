@@ -34,8 +34,8 @@ RailSight AI Architecture
 │   ├── Unified Feature Schema Transformer (transformation.py)
 │   ├── ML Engine & Model Serialization (backend/models/eta_xgboost.json)
 │   │   ├── Model 1: Schedule Baseline (Traditional Timetable Offset)
-│   │   ├── Model 2: Random Forest Regressor (MAE: 8.06m, RMSE: 11.24m)
-│   │   └── Model 3: XGBoost Regressor (MAE: 6.68m, RMSE: 8.81m, R²: 0.9989)
+│   │   ├── Model 2: Random Forest Regressor (MAE: 7.73m, RMSE: 10.19m, R²: 0.9984)
+│   │   └── Model 3: XGBoost Regressor (MAE: 6.91m, RMSE: 9.41m, R²: 0.9986)
 │   ├── Model Explainability Module (ml/explainability.py)
 │   ├── Live Simulation Ticker Service (15-second background loop)
 │   └── REST API Endpoints (/api/trains/{id}/live, /eta, /explanation, /network/congestion, /alerts)
@@ -70,9 +70,9 @@ Evaluation performed on engineered Indian Railways train tracking datasets:
 
 | Model | MAE (min) | RMSE (min) | $R^2$ Score | Description |
 | :--- | :---: | :---: | :---: | :--- |
-| **Model 1: Schedule Baseline** | `11.84` | `15.88` | `0.9966` | Traditional NTES delay projection |
-| **Model 2: Random Forest** | `8.06` | `11.24` | `0.9983` | Baseline tree ensemble |
-| **Model 3: XGBoost Regressor** | **`6.68`** | **`8.81`** | **`0.9989`** | **Primary Production Model** |
+| **Model 1: Schedule Baseline** | `11.17` | `15.10` | `0.9965` | Traditional NTES delay projection |
+| **Model 2: Random Forest** | `7.73` | `10.19` | `0.9984` | Baseline tree ensemble |
+| **Model 3: XGBoost Regressor** | **`6.91`** | **`9.41`** | **`0.9986`** | **Primary Production Model** |
 
 ---
 
