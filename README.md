@@ -28,7 +28,10 @@ Where the target variable $\text{remaining\_travel\_time\_minutes}$ is continuou
 ```
 RailSight AI Architecture
 ├── Python FastAPI Backend (Port 8000)
-│   ├── Dataset Ingestion & Unified Schema Transformation (ingestion.py, transformation.py)
+│   ├── Dataset Ingestion Adapters
+│   │   ├── Indian Railways Historical Tracking Data Generator (ingestion.py)
+│   │   └── Kaggle 'vishwassrivastava1/indian-railway-delay-dataset' Adapter (ingest_kaggle_delay_dataset.py)
+│   ├── Unified Feature Schema Transformer (transformation.py)
 │   ├── ML Engine & Model Serialization (backend/models/eta_xgboost.json)
 │   │   ├── Model 1: Schedule Baseline (Traditional Timetable Offset)
 │   │   ├── Model 2: Random Forest Regressor (MAE: 8.06m, RMSE: 11.24m)
