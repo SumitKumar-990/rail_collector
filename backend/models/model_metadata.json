@@ -1,0 +1,41 @@
+{
+  "model_type": "XGBoost Regressor",
+  "feature_names": [
+    "current_delay_minutes",
+    "current_speed_kmph",
+    "distance_to_next_station_km",
+    "distance_remaining_km",
+    "scheduled_remaining_time_minutes",
+    "historical_avg_delay_minutes",
+    "station_avg_delay_minutes",
+    "route_avg_delay_minutes",
+    "hour_of_day",
+    "day_of_week",
+    "month",
+    "weather_score",
+    "rainfall_mm",
+    "congestion_score",
+    "speed_restriction_score",
+    "signal_delay_score",
+    "previous_station_delay",
+    "upcoming_station_count"
+  ],
+  "metrics": {
+    "schedule_baseline": {
+      "mae": 11.84,
+      "rmse": 15.88,
+      "r2": 0.9966
+    },
+    "random_forest": {
+      "mae": 8.06,
+      "rmse": 11.24,
+      "r2": 0.9983
+    },
+    "xgboost": {
+      "mae": 6.68,
+      "rmse": 8.81,
+      "r2": 0.9989
+    }
+  },
+  "trained_at": "2026-08-28T17:09:54.737784"
+}

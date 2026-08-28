@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production & Build
+dist/
+build/
+
+# Python & ML
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# Large Datasets & Cache
+backend/data/raw/
+backend/data/processed/
+
+# Environment & IDE
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.vscode/
+.idea/
+
+# System Files
+.DS_Store
+Thumbs.db
