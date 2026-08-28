@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Train } from '../../types';
-import { Sparkles, TrendingUp, Cpu, CheckCircle, HelpCircle, ArrowUpRight } from 'lucide-react';
+import { Sparkles, TrendingUp, Cpu, HelpCircle, ArrowUpRight, ShieldCheck } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 
 interface EtaPredictionsViewProps {
@@ -29,13 +29,12 @@ export default function EtaPredictionsView({
     return {
       station: stop.stationCode,
       name: stop.stationName,
-      'Scheduled Arrival': schTotal,
+      'Schedule Baseline': schTotal,
       'Traditional NTES ETA': tradTotal,
-      'Random Forest Baseline': rfTotal,
-      'RailSight AI XGBoost Predicted ETA': predTotal
+      'Random Forest Model': rfTotal,
+      'XGBoost Production ETA': predTotal
     };
   });
-
 
   return (
     <div className="space-y-6">
@@ -44,21 +43,21 @@ export default function EtaPredictionsView({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-xs font-bold font-mono uppercase tracking-wider mb-2">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>AI Real-Time ETA Predictor</span>
+            <span>AI Real-Time Multi-Train Fleet Predictor</span>
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight font-heading">
-            Dynamic ETA Predictions
+            Fleet-Wide Dynamic ETA Predictions
           </h1>
           <p className="text-slate-300 text-sm mt-1 max-w-2xl">
-            Continuously updated using live train movement, historical corridor patterns, signaling interlocks, and weather radar telemetry.
+            Continuously updated using live telemetry, signal interlocks, track density, and saved dual ML models (XGBoost + Random Forest).
           </p>
         </div>
 
         <div className="flex items-center gap-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800 shrink-0">
           <Cpu className="w-8 h-8 text-cyan-400" />
           <div>
-            <div className="text-xs font-bold text-slate-300">Predictive Model</div>
-            <div className="text-sm font-black text-white font-mono">SpatioTemporal Graph Neural Network</div>
+            <div className="text-xs font-bold text-slate-300">Validation Notice</div>
+            <div className="text-xs font-bold text-emerald-400 font-mono">Engineered Prototype Dataset</div>
           </div>
         </div>
       </div>
@@ -70,11 +69,11 @@ export default function EtaPredictionsView({
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-blue-600" />
               <h3 className="text-base font-bold text-slate-900 font-heading">
-                ETA Model Accuracy Comparison: {selectedTrain.number} {selectedTrain.name}
+                Dual Model Accuracy Benchmark: {selectedTrain.number} {selectedTrain.name}
               </h3>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Comparing Scheduled timetable vs Traditional static delay vs RailSight AI predictions
+              Real inference comparing Schedule Baseline vs Saved Random Forest vs Primary XGBoost Regressor
             </p>
           </div>
 
@@ -120,19 +119,18 @@ export default function EtaPredictionsView({
                 contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#fff', borderRadius: '8px' }}
               />
               <Legend wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
-              <Line type="monotone" dataKey="Scheduled Arrival" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" />
+              <Line type="monotone" dataKey="Schedule Baseline" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" />
               <Line type="monotone" dataKey="Traditional NTES ETA" stroke="#f59e0b" strokeWidth={2} />
-              <Line type="monotone" dataKey="Random Forest Baseline" stroke="#3b82f6" strokeWidth={2} strokeDasharray="3 3" />
-              <Line type="monotone" dataKey="RailSight AI XGBoost Predicted ETA" stroke="#10b981" strokeWidth={3.5} dot={{ r: 5 }} />
+              <Line type="monotone" dataKey="Random Forest Model" stroke="#3b82f6" strokeWidth={2} strokeDasharray="3 3" />
+              <Line type="monotone" dataKey="XGBoost Production ETA" stroke="#10b981" strokeWidth={3.5} dot={{ r: 5 }} />
             </LineChart>
-
           </ResponsiveContainer>
         </div>
 
         <div className="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-200/80 flex items-start gap-3 text-xs text-blue-900">
           <HelpCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
           <div>
-            <strong className="font-bold">Why is RailSight AI predictions more accurate?</strong> Traditional delay tools only project current delay linearly across all future stations. RailSight AI evaluates downstream track occupancy, junction signal interlocks, fog speed limits, and schedule buffer padding to calculate true actual arrival times.
+            <strong className="font-bold">Dual Model ML Comparison:</strong> Both Random Forest (`eta_random_forest.pkl`, MAE 7.74m) and XGBoost (`eta_xgboost.json`, MAE 7.29m) are saved and evaluated during live batch predictions.
           </div>
         </div>
       </div>
@@ -141,8 +139,8 @@ export default function EtaPredictionsView({
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-900 font-heading">AI Live Predictions Table</h3>
-            <p className="text-xs text-slate-500">Highlighted AI arrival projections vs baseline scheduled timings</p>
+            <h3 className="text-base font-bold text-slate-900 font-heading">Active Fleet Predictions Table ({trains.length} Trains)</h3>
+            <p className="text-xs text-slate-500">Live predictions across active dynamic registry trains</p>
           </div>
         </div>
 
@@ -153,11 +151,10 @@ export default function EtaPredictionsView({
                 <th className="py-3.5 px-4">Train</th>
                 <th className="py-3.5 px-4">Current Station</th>
                 <th className="py-3.5 px-4">Upcoming Station</th>
-                <th className="py-3.5 px-4">Scheduled Arrival</th>
-                <th className="py-3.5 px-4">Traditional ETA</th>
-                <th className="py-3.5 px-4 bg-emerald-50 text-emerald-900 font-black">AI Predicted ETA</th>
-                <th className="py-3.5 px-4">Difference</th>
-                <th className="py-3.5 px-4">Confidence</th>
+                <th className="py-3.5 px-4">Schedule Baseline</th>
+                <th className="py-3.5 px-4 bg-emerald-50 text-emerald-900 font-black">XGBoost Predicted ETA</th>
+                <th className="py-3.5 px-4">Delay</th>
+                <th className="py-3.5 px-4">Data Reliability</th>
                 <th className="py-3.5 px-4 text-right">Action</th>
               </tr>
             </thead>
@@ -175,7 +172,6 @@ export default function EtaPredictionsView({
                   <td className="py-4 px-4 text-slate-700 font-semibold">{train.currentLocation}</td>
                   <td className="py-4 px-4 text-slate-600">{train.nextStation}</td>
                   <td className="py-4 px-4 font-mono text-slate-500">{train.scheduledEta}</td>
-                  <td className="py-4 px-4 font-mono text-slate-600">{train.traditionalEta}</td>
 
                   {/* PROMINENT AI PREDICTED ETA */}
                   <td className="py-4 px-4 bg-emerald-50/70 border-x border-emerald-100 font-mono font-black text-emerald-800 text-base">
@@ -196,8 +192,8 @@ export default function EtaPredictionsView({
 
                   <td className="py-4 px-4 font-mono font-bold text-slate-800">
                     <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
-                      <span>{train.confidenceScore}%</span>
+                      <ShieldCheck className="w-4 h-4 text-cyan-500" />
+                      <span>{train.confidenceScore}% Reliability</span>
                     </div>
                   </td>
 

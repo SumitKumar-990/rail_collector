@@ -53,7 +53,6 @@ export function useLiveTrainData() {
       lastTickTimestamp: new Date().toLocaleTimeString()
     });
     mockTrainService.triggerSimulationEvent(selectedTrainId, 'reset', true);
-    setTrains(INITIAL_TRAINS);
     setToastNotification('Live telemetry reset to standard XGBoost AI baseline model.');
   }, [selectedTrainId]);
 
@@ -64,39 +63,22 @@ export function useLiveTrainData() {
     }
   }, [toastNotification]);
 
-  // Live telemetry fetch & ticker
+  // PRIORITY 1: Multi-Train Live Telemetry Synchronization
   useEffect(() => {
-    const fetchLatestEta = async () => {
+    const fetchFleetData = async () => {
       try {
-        const etaRes = await mockTrainService.getTrainETA(selectedTrainId);
-        const explanationRes = await mockTrainService.getPredictionExplanation(selectedTrainId);
-
-        setTrains(prevTrains => {
-          return prevTrains.map(t => {
-            if (t.id === selectedTrainId) {
-              return {
-                ...t,
-                aiPredictedEta: etaRes.aiPredictedEta,
-                remainingTravelTimeMinutes: etaRes.remainingTravelTimeMinutes,
-                delayMinutes: etaRes.delayMinutes,
-                confidenceScore: etaRes.confidenceScore,
-                dataQuality: etaRes.dataQuality,
-                dataSourceTransparency: etaRes.dataSourceTransparency,
-                delayFactors: explanationRes.delayFactors.length > 0 ? explanationRes.delayFactors : t.delayFactors,
-                lastUpdated: 'Just now'
-              };
-            }
-            return t;
-          });
-        });
+        const fleetList = await mockTrainService.getTrains();
+        if (fleetList && fleetList.length > 0) {
+          setTrains(fleetList);
+        }
       } catch (e) {
         // Fallback
       }
     };
 
-    fetchLatestEta();
+    fetchFleetData();
     const interval = setInterval(() => {
-      fetchLatestEta();
+      fetchFleetData();
       setSimulationState(prev => ({
         ...prev,
         lastTickTimestamp: new Date().toLocaleTimeString()

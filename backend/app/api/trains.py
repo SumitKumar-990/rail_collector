@@ -1,7 +1,8 @@
 import os
 import sys
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from datetime import datetime, timedelta
+from typing import List, Dict, Any
 
 # Ensure backend directory is in sys.path
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -11,130 +12,90 @@ if backend_dir not in sys.path:
 from ml.predict import predictor
 from ml.feature_engineering import (
     calculate_distance_remaining,
-    calculate_scheduled_remaining_time,
-    calculate_weather_score,
-    calculate_estimated_congestion_score,
-    calculate_speed_restriction_score
+    calculate_scheduled_remaining_time
 )
+from app.api.train_registry import train_registry
+from data.dataset_metadata import get_dataset_metadata
 
-router = APIRouter(prefix="/api/trains", tags=["Trains"])
+router = APIRouter(prefix="/api", tags=["Trains"])
 
-# Database state of monitored trains
-MONITORED_TRAINS_STATE = {
-    "12301": {
-        "train_id": "12301",
-        "train_number": "12301",
-        "train_name": "Howrah Rajdhani Express",
-        "type": "Rajdhani",
-        "zone": "ER",
-        "origin": "New Delhi",
-        "destination": "Howrah Junction",
-        "current_station": "Kanpur Central",
-        "next_station": "Prayagraj Junction",
-        "target_station": "Prayagraj Junction",
-        "latitude": 26.4499,
-        "longitude": 80.3319,
-        "speed": 92.0,
-        "current_delay_minutes": 18.0,
-        "distance_covered_km": 440.0,
-        "total_distance_km": 1447.0,
-        "weather_score": 0.35,
-        "rainfall_mm": 8.0,
-        "congestion_score": 0.45,
-        "speed_restriction_score": 0.4,
-        "signal_delay_score": 0.0,
-        "is_estimated": False,
-        "data_source": "LIVE GPS + SIGNAL INTERLOCK"
-    },
-    "12951": {
-        "train_id": "12951",
-        "train_number": "12951",
-        "train_name": "Mumbai Rajdhani Express",
-        "type": "Rajdhani",
-        "zone": "WR",
-        "origin": "Mumbai Central",
-        "destination": "New Delhi",
-        "current_station": "Kota Junction",
-        "next_station": "Sawai Madhopur",
-        "target_station": "New Delhi",
-        "latitude": 25.2138,
-        "longitude": 75.8648,
-        "speed": 112.0,
-        "current_delay_minutes": 2.0,
-        "distance_covered_km": 910.0,
-        "total_distance_km": 1386.0,
-        "weather_score": 0.0,
-        "rainfall_mm": 0.0,
-        "congestion_score": 0.1,
-        "speed_restriction_score": 0.0,
-        "signal_delay_score": 0.0,
-        "is_estimated": False,
-        "data_source": "LIVE GPS + SIGNAL INTERLOCK"
-    },
-    "12002": {
-        "train_id": "12002",
-        "train_number": "12002",
-        "train_name": "Bhopal Shatabdi Express",
-        "type": "Shatabdi",
-        "zone": "NCR",
-        "origin": "New Delhi",
-        "destination": "Rani Kamlapati",
-        "current_station": "Agra Cantt",
-        "next_station": "Gwalior Junction",
-        "target_station": "Rani Kamlapati",
-        "latitude": 27.1593,
-        "longitude": 77.9946,
-        "speed": 130.0,
-        "current_delay_minutes": 0.0,
-        "distance_covered_km": 195.0,
-        "total_distance_km": 706.0,
-        "weather_score": 0.0,
-        "rainfall_mm": 0.0,
-        "congestion_score": 0.05,
-        "speed_restriction_score": 0.0,
-        "signal_delay_score": 0.0,
-        "is_estimated": False,
-        "data_source": "LIVE GPS + SIGNAL INTERLOCK"
-    },
-    "12309": {
-        "train_id": "12309",
-        "train_number": "12309",
-        "train_name": "Patna Tejas Rajdhani Express",
-        "type": "Rajdhani",
-        "zone": "ECR",
-        "origin": "Rajendra Nagar",
-        "destination": "New Delhi",
-        "current_station": "Mirzapur",
-        "next_station": "Prayagraj Junction",
-        "target_station": "New Delhi",
-        "latitude": 25.146,
-        "longitude": 82.569,
-        "speed": 45.0,
-        "current_delay_minutes": 52.0,
-        "distance_covered_km": 530.0,
-        "total_distance_km": 1002.0,
-        "weather_score": 0.2,
-        "rainfall_mm": 4.0,
-        "congestion_score": 0.75,
-        "speed_restriction_score": 0.5,
-        "signal_delay_score": 0.8,
-        "is_estimated": False,
-        "data_source": "LIVE GPS + SIGNAL INTERLOCK"
+@router.get("/trains")
+async def get_all_active_trains():
+    """
+    [PRIORITY 1: TRUE MULTI-TRAIN LIVE ETA SYSTEM]
+    Returns all active trains and their live state from the dynamic Train Registry.
+    Endpoint: GET /api/trains
+    """
+    trains = train_registry.get_all_trains()
+    return {
+        "count": len(trains),
+        "status": "Operational",
+        "trains": trains
     }
-}
 
-@router.get("/{train_id}/live")
+@router.post("/trains/batch-eta")
+async def batch_predict_train_eta(payload: Dict[str, Any] = Body(default={})):
+    """
+    [PRIORITY 1 & 2: BATCH ETA PREDICTION & DUAL MODEL COMPARISON]
+    Performs batch ML inference across multiple active train records using BOTH trained models
+    (XGBoost Regressor & Random Forest Regressor) plus Schedule Baseline.
+    Endpoint: POST /api/trains/batch-eta
+    """
+    train_records = payload.get("trains", [])
+    
+    # If empty payload passed, perform batch predictions for all trains in the dynamic registry
+    if not train_records:
+        active_trains = train_registry.get_all_trains()
+        train_records = []
+        for t in active_trains:
+            dist_rem = calculate_distance_remaining(t["total_distance_km"], t["distance_covered_km"])
+            sched_rem_time = calculate_scheduled_remaining_time(dist_rem, 85.0)
+            train_records.append({
+                "train_id": t["train_id"],
+                "train_name": t["train_name"],
+                "destination": t["destination"],
+                "current_delay_minutes": t["current_delay_minutes"],
+                "current_speed_kmph": t["speed"],
+                "distance_remaining_km": dist_rem,
+                "scheduled_remaining_time_minutes": sched_rem_time,
+                "weather_score": t["weather_score"],
+                "rainfall_mm": t["rainfall_mm"],
+                "congestion_score": t["congestion_score"],
+                "speed_restriction_score": t["speed_restriction_score"],
+                "signal_delay_score": t["signal_delay_score"],
+                "is_estimated": t["is_estimated"],
+                "is_simulated": t.get("is_simulated", False)
+            })
+
+    results = predictor.predict_batch_eta(train_records)
+    return {
+        "count": len(results),
+        "timestamp": datetime.now().isoformat(),
+        "predictions": results
+    }
+
+@router.get("/dataset/metadata")
+async def get_dataset_info_metadata():
+    """
+    [PRIORITY 0 & 3: DATASET METADATA & DATA REALISM]
+    Returns dataset metadata, record counts, train/test split info, and fallback priority hierarchy.
+    Endpoint: GET /api/dataset/metadata
+    """
+    return get_dataset_metadata()
+
+@router.get("/trains/{train_id}/live")
 async def get_live_train_status(train_id: str):
     """
-    Returns live running status, coordinates, current speed, and delay.
+    Returns live running status, coordinates, current speed, and delay for a specific train.
     Endpoint: GET /api/trains/{train_id}/live
     """
-    train = MONITORED_TRAINS_STATE.get(train_id)
+    train = train_registry.get_train_by_id(train_id)
     if not train:
-        raise HTTPException(status_code=404, detail=f"Train {train_id} not found")
+        raise HTTPException(status_code=404, detail=f"Train {train_id} not found in dynamic registry")
         
     return {
         "train_id": train["train_id"],
+        "train_number": train["train_number"],
         "train_name": train["train_name"],
         "current_station": train["current_station"],
         "latitude": train["latitude"],
@@ -144,15 +105,16 @@ async def get_live_train_status(train_id: str):
         "data_source": train["data_source"]
     }
 
-@router.get("/{train_id}/eta")
+@router.get("/trains/{train_id}/eta")
 async def get_train_eta_prediction(train_id: str):
     """
-    Returns dynamic XGBoost ETA prediction, remaining travel time, confidence, data quality, and transparent tags.
+    [PRIORITY 2 & 4: REAL DUAL MODEL PREDICTIONS & DATA RELIABILITY SCORE]
+    Returns XGBoost prediction, Random Forest prediction, Schedule Baseline, Data Reliability Score, and lineage tags.
     Endpoint: GET /api/trains/{train_id}/eta
     """
-    train = MONITORED_TRAINS_STATE.get(train_id)
+    train = train_registry.get_train_by_id(train_id)
     if not train:
-        raise HTTPException(status_code=404, detail=f"Train {train_id} not found")
+        raise HTTPException(status_code=404, detail=f"Train {train_id} not found in dynamic registry")
 
     dist_rem = calculate_distance_remaining(train["total_distance_km"], train["distance_covered_km"])
     sched_rem_time = calculate_scheduled_remaining_time(dist_rem, 85.0)
@@ -164,7 +126,7 @@ async def get_train_eta_prediction(train_id: str):
         "distance_to_next_station_km": 65.0,
         "distance_remaining_km": dist_rem,
         "scheduled_remaining_time_minutes": sched_rem_time,
-        "historical_avg_delay_minutes": 14.0,
+        "historical_avg_delay_minutes": train.get("historical_delay", 14.0),
         "station_avg_delay_minutes": 8.0,
         "route_avg_delay_minutes": 11.0,
         "hour_of_day": datetime.now().hour,
@@ -185,6 +147,7 @@ async def get_train_eta_prediction(train_id: str):
     target_st = train.get("target_station", train["next_station"])
     prediction_result = predictor.predict_dynamic_eta(feature_dict, current_time=current_ts, target_station=target_st)
 
+    # Return structured dual model predictions + baseline
     return {
         "train_id": train["train_id"],
         "train_name": train["train_name"],
@@ -194,26 +157,36 @@ async def get_train_eta_prediction(train_id: str):
         "predicted_eta": prediction_result["predicted_eta"],
         "predicted_eta_formatted": prediction_result["predicted_eta_formatted"],
         "delay_minutes": int(train["current_delay_minutes"]),
-        "prediction_confidence": prediction_result["prediction_confidence"],
+        
+        # Real Model Comparisons (Priority 2)
+        "model_predictions": prediction_result["model_predictions"],
+        "schedule_baseline_minutes": prediction_result["model_predictions"]["schedule_baseline_minutes"],
+        "random_forest_minutes": prediction_result["model_predictions"]["random_forest_minutes"],
+        "xgboost_minutes": prediction_result["model_predictions"]["xgboost_minutes"],
+
+        # Data Reliability Score (Priority 4)
+        "data_reliability_score": prediction_result["data_reliability_score"],
         "data_quality": prediction_result["data_quality"],
         "data_sources": prediction_result["data_sources"],
         "data_source_transparency": {
             "is_live_gps": not train["is_estimated"],
             "is_estimated": train["is_estimated"],
             "is_simulated": train.get("is_simulated", False),
-            "model_type": "XGBoost Regressor (eta_xgboost.json)"
-        }
+            "model_type": "XGBoost Regressor (eta_xgboost.json) + Random Forest (eta_random_forest.pkl)"
+        },
+        "validation_notice": "Validated on current engineered prototype dataset"
     }
 
-@router.get("/{train_id}/eta/explanation")
+@router.get("/trains/{train_id}/eta/explanation")
 async def get_train_eta_explanation(train_id: str):
     """
-    Returns feature attribution explanation factors based strictly on model features.
+    [PRIORITY 5: OPERATIONAL ETA IMPACT ANALYSIS]
+    Returns factor contribution breakdown for schedule variance.
     Endpoint: GET /api/trains/{train_id}/eta/explanation
     """
-    train = MONITORED_TRAINS_STATE.get(train_id)
+    train = train_registry.get_train_by_id(train_id)
     if not train:
-        raise HTTPException(status_code=404, detail=f"Train {train_id} not found")
+        raise HTTPException(status_code=404, detail=f"Train {train_id} not found in dynamic registry")
 
     dist_rem = calculate_distance_remaining(train["total_distance_km"], train["distance_covered_km"])
     sched_rem_time = calculate_scheduled_remaining_time(dist_rem, 85.0)
@@ -237,9 +210,10 @@ async def get_train_eta_explanation(train_id: str):
 
     return {
         "train_id": train["train_id"],
+        "explanation_type": "Operational ETA Impact Analysis",
         "prediction": {
             "eta": prediction_result["predicted_eta_formatted"],
-            "confidence": prediction_result["prediction_confidence"],
+            "reliability_score": prediction_result["data_reliability_score"],
             "remaining_travel_time_minutes": prediction_result["remaining_travel_time_minutes"]
         },
         "factors": prediction_result["prediction_factors"],

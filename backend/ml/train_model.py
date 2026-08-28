@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import joblib
 import pandas as pd
 import numpy as np
 
@@ -14,6 +15,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import xgboost as xgb
 
 from ml.dataset_builder import dataset_builder, FEATURE_COLUMNS, TARGET_COLUMN
+from data.dataset_metadata import get_dataset_metadata
 
 def generate_model_evaluation_doc(
     split_info: dict,
@@ -29,6 +31,8 @@ def generate_model_evaluation_doc(
 
     content = f"""# RailSight AI - Model Evaluation & Leakage Audit Report
 
+> **Notice**: Validated on the current engineered prototype dataset.
+
 ## 1. Dataset & Split Specifications
 
 * **Total Dataset Size**: {split_info['total_samples']} records
@@ -42,15 +46,15 @@ def generate_model_evaluation_doc(
 
 ## 2. Model Performance & Comparative Benchmark
 
-| Model | MAE (Average ETA Error) | RMSE | R² Score | Performance Rank |
-| :--- | ---: | ---: | ---: | :--- |
-| **Model 1: Schedule Baseline** | **{mae_base:.2f} mins** | {rmse_base:.2f} mins | {r2_base:.4f} | Deterministic Baseline |
-| **Model 2: Random Forest Regressor** | **{mae_rf:.2f} mins** | {rmse_rf:.2f} mins | {r2_rf:.4f} | Machine Learning Baseline |
-| **Model 3: XGBoost Regressor (Primary)** | **{mae_xgb:.2f} mins** | {rmse_xgb:.2f} mins | {r2_xgb:.4f} | **Primary Production Model** |
+| Model | MAE (Average ETA Error) | RMSE | R² Score | Performance Rank | Saved Artifact |
+| :--- | ---: | ---: | ---: | :--- | :--- |
+| **Model 1: Schedule Baseline** | **{mae_base:.2f} mins** | {rmse_base:.2f} mins | {r2_base:.4f} | Deterministic Baseline | Timetable Formula |
+| **Model 2: Random Forest Regressor** | **{mae_rf:.2f} mins** | {rmse_rf:.2f} mins | {r2_rf:.4f} | Machine Learning Baseline | `eta_random_forest.pkl` |
+| **Model 3: XGBoost Regressor (Primary)** | **{mae_xgb:.2f} mins** | {rmse_xgb:.2f} mins | {r2_xgb:.4f} | **Primary Production Model** | `eta_xgboost.json` |
 
 > [!NOTE]
-> The primary metric for SIH evaluation is **MAE (Mean Absolute Error in minutes)**. 
-> An Average ETA Error of **{mae_xgb:.2f} minutes** indicates high operational accuracy without data leakage.
+> Primary evaluation metric: **MAE (Mean Absolute Error in minutes)**.
+> Both Random Forest (`eta_random_forest.pkl`) and XGBoost (`eta_xgboost.json`) are fully saved and executed during live inference.
 
 ---
 
@@ -89,11 +93,12 @@ def generate_model_evaluation_doc(
 def train_and_evaluate_models():
     """
     Trains Baseline Schedule, Random Forest, and XGBoost Regressor models.
-    Uses Journey-Aware Train/Test Split to prevent leakage.
-    Saves trained XGBoost artifact to backend/models/eta_xgboost.json.
+    Saves BOTH trained models:
+    - backend/models/eta_xgboost.json
+    - backend/models/eta_random_forest.pkl
     """
     print("\n=======================================================")
-    print("    RAILSIGHT AI - REBUILDING & TRAINING ML MODELS     ")
+    print("    RAILSIGHT AI - REBUILDING & TRAINING DUAL ML MODELS")
     print("=======================================================")
 
     # 1. Obtain Journey-Aware Split
@@ -101,7 +106,6 @@ def train_and_evaluate_models():
 
     # -------------------------------------------------------------
     # MODEL 1: SCHEDULE BASELINE
-    # Traditional Remaining = Scheduled Remaining + (Current Delay * 0.7)
     # -------------------------------------------------------------
     y_pred_baseline = X_test["scheduled_remaining_time_minutes"] + (X_test["current_delay_minutes"] * 0.7)
     mae_base = mean_absolute_error(y_test, y_pred_baseline)
@@ -109,7 +113,7 @@ def train_and_evaluate_models():
     r2_base = r2_score(y_test, y_pred_baseline)
 
     # -------------------------------------------------------------
-    # MODEL 2: RANDOM FOREST REGRESSOR
+    # MODEL 2: RANDOM FOREST REGRESSOR (PERSISTED)
     # -------------------------------------------------------------
     rf_model = RandomForestRegressor(n_estimators=100, max_depth=12, random_state=42)
     rf_model.fit(X_train, y_train)
@@ -120,7 +124,7 @@ def train_and_evaluate_models():
     r2_rf = r2_score(y_test, y_pred_rf)
 
     # -------------------------------------------------------------
-    # MODEL 3: XGBOOST REGRESSOR (Primary Production Model)
+    # MODEL 3: XGBOOST REGRESSOR (PRIMARY PERSISTED MODEL)
     # -------------------------------------------------------------
     xgb_model = xgb.XGBRegressor(
         n_estimators=150,
@@ -147,19 +151,28 @@ def train_and_evaluate_models():
     print(f" PRIMARY METRIC: Average ETA Error = {mae_xgb:.2f} minutes")
     print("=======================================================\n")
 
-    # Save Model Artifacts
+    # Save Model Artifacts (BOTH XGBoost & Random Forest)
     models_dir = os.path.join(backend_dir, "models")
     os.makedirs(models_dir, exist_ok=True)
-    model_path = os.path.join(models_dir, "eta_xgboost.json")
-    xgb_model.save_model(model_path)
+    
+    xgb_path = os.path.join(models_dir, "eta_xgboost.json")
+    xgb_model.save_model(xgb_path)
+
+    rf_path = os.path.join(models_dir, "eta_random_forest.pkl")
+    joblib.dump(rf_model, rf_path)
     
     # Save Metadata & Feature Names
     meta_path = os.path.join(models_dir, "model_metadata.json")
     meta = {
-        "model_type": "XGBoost Regressor",
+        "model_type": "XGBoost Regressor & Random Forest Regressor",
+        "notice": "Validated on current engineered prototype dataset",
         "feature_names": FEATURE_COLUMNS,
         "target_column": TARGET_COLUMN,
         "split_strategy": split_info["split_strategy"],
+        "saved_models": {
+            "xgboost": "eta_xgboost.json",
+            "random_forest": "eta_random_forest.pkl"
+        },
         "metrics": {
             "schedule_baseline": {"mae": round(mae_base, 2), "rmse": round(rmse_base, 2), "r2": round(r2_base, 4)},
             "random_forest": {"mae": round(mae_rf, 2), "rmse": round(rmse_rf, 2), "r2": round(r2_rf, 4)},
@@ -171,7 +184,8 @@ def train_and_evaluate_models():
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
 
-    print(f"[OK] Saved trained XGBoost model to {model_path}")
+    print(f"[OK] Saved trained XGBoost model to {xgb_path}")
+    print(f"[OK] Saved trained Random Forest model to {rf_path}")
     print(f"[OK] Saved model metadata to {meta_path}")
 
     # Generate docs/model_evaluation.md

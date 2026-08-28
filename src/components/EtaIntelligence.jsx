@@ -9,12 +9,12 @@ export default function EtaIntelligence({ impacts, confidence }) {
 
   return (
     <section className="intelligence-section">
-      {/* LEFT: Why the ETA Changed */}
+      {/* LEFT: Operational ETA Impact Analysis */}
       <div className="intel-card">
         <div className="intel-card-header">
           <div>
-            <h3 className="intel-title">Why the ETA changed</h3>
-            <p className="intel-subtitle">AI factor decomposition & time delta impact</p>
+            <h3 className="intel-title">Operational ETA Impact Analysis</h3>
+            <p className="intel-subtitle">Feature contribution breakdown & schedule variance impact</p>
           </div>
           <Info size={18} color="var(--text-muted)" />
         </div>
@@ -34,12 +34,12 @@ export default function EtaIntelligence({ impacts, confidence }) {
         </div>
       </div>
 
-      {/* RIGHT: Prediction Confidence */}
+      {/* RIGHT: Data Reliability Score */}
       <div className="intel-card">
         <div className="intel-card-header">
           <div>
-            <h3 className="intel-title">Prediction Confidence</h3>
-            <p className="intel-subtitle">Multi-source ensemble model accuracy</p>
+            <h3 className="intel-title">Data Reliability Score</h3>
+            <p className="intel-subtitle">GPS freshness, weather availability & telemetry quality</p>
           </div>
           <ShieldCheck size={20} color="var(--accent-cyan)" />
         </div>
@@ -74,22 +74,22 @@ export default function EtaIntelligence({ impacts, confidence }) {
 
           {/* Model Features Checklist */}
           <div className="confidence-factors">
-            <span className="factors-title">Prediction based on:</span>
+            <span className="factors-title">Score calculated from:</span>
             <div className="factor-bullet">
               <span className="factor-dot"></span>
-              <span>Live Train Telemetry</span>
+              <span>GPS Telemetry Freshness</span>
             </div>
             <div className="factor-bullet">
               <span className="factor-dot"></span>
-              <span>Route & Track Conditions</span>
+              <span>Open-Meteo Weather Stream</span>
             </div>
             <div className="factor-bullet">
               <span className="factor-dot"></span>
-              <span>Micro-Weather Datasets</span>
+              <span>Section Density Reliability</span>
             </div>
             <div className="factor-bullet">
               <span className="factor-dot"></span>
-              <span>Historical Congestion Patterns</span>
+              <span>Validation Error Bounds</span>
             </div>
           </div>
         </div>

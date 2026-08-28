@@ -1,5 +1,7 @@
 # RailSight AI - Model Evaluation & Leakage Audit Report
 
+> **Notice**: Validated on the current engineered prototype dataset.
+
 ## 1. Dataset & Split Specifications
 
 * **Total Dataset Size**: 2500 records
@@ -13,15 +15,15 @@
 
 ## 2. Model Performance & Comparative Benchmark
 
-| Model | MAE (Average ETA Error) | RMSE | R² Score | Performance Rank |
-| :--- | ---: | ---: | ---: | :--- |
-| **Model 1: Schedule Baseline** | **11.17 mins** | 15.10 mins | 0.9965 | Deterministic Baseline |
-| **Model 2: Random Forest Regressor** | **7.73 mins** | 10.19 mins | 0.9984 | Machine Learning Baseline |
-| **Model 3: XGBoost Regressor (Primary)** | **6.91 mins** | 9.41 mins | 0.9986 | **Primary Production Model** |
+| Model | MAE (Average ETA Error) | RMSE | R² Score | Performance Rank | Saved Artifact |
+| :--- | ---: | ---: | ---: | :--- | :--- |
+| **Model 1: Schedule Baseline** | **11.17 mins** | 15.10 mins | 0.9965 | Deterministic Baseline | Timetable Formula |
+| **Model 2: Random Forest Regressor** | **7.74 mins** | 10.19 mins | 0.9984 | Machine Learning Baseline | `eta_random_forest.pkl` |
+| **Model 3: XGBoost Regressor (Primary)** | **7.29 mins** | 10.10 mins | 0.9984 | **Primary Production Model** | `eta_xgboost.json` |
 
 > [!NOTE]
-> The primary metric for SIH evaluation is **MAE (Mean Absolute Error in minutes)**. 
-> An Average ETA Error of **6.91 minutes** indicates high operational accuracy without data leakage.
+> Primary evaluation metric: **MAE (Mean Absolute Error in minutes)**.
+> Both Random Forest (`eta_random_forest.pkl`) and XGBoost (`eta_xgboost.json`) are fully saved and executed during live inference.
 
 ---
 

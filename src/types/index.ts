@@ -44,8 +44,26 @@ export interface DataSourceTransparency {
 
 export interface DataQualityScore {
   score: number; // 0.0 - 1.0
+  gps_freshness?: string;
   estimated_telemetry: boolean;
   weather_available: boolean;
+  data_reliability_label?: string;
+}
+
+export interface ModelPredictions {
+  schedule_baseline_minutes: number;
+  random_forest_minutes: number;
+  xgboost_minutes: number;
+}
+
+export interface DatasetMetadata {
+  dataset_name: string;
+  dataset_type: string;
+  status_notice: string;
+  record_counts: Record<string, number>;
+  feature_count: number;
+  evaluation_metrics: Record<string, any>;
+  fallback_priority_hierarchy: string[];
 }
 
 export interface Train {
@@ -53,7 +71,7 @@ export interface Train {
   number: string;
   name: string;
   type: 'Rajdhani' | 'Shatabdi' | 'Vande Bharat' | 'Duronto' | 'Superfast Express';
-  zone: 'NR' | 'ER' | 'WR' | 'NCR' | 'ECR' | 'CR' | 'SER' | 'WCR';
+  zone: 'NR' | 'ER' | 'WR' | 'NCR' | 'ECR' | 'CR' | 'SER' | 'WCR' | 'SR' | 'NER';
   origin: string;
   originCode: string;
   destination: string;
@@ -69,12 +87,21 @@ export interface Train {
   scheduledEta: string; // HH:MM
   traditionalEta: string; // HH:MM
   aiPredictedEta: string; // HH:MM
+  randomForestEta?: string;
+  scheduleBaselineEta?: string;
   remainingTravelTimeMinutes?: number;
   delayMinutes: number;
   status: TrainStatus;
-  confidenceScore: number; // percentage (e.g. 96)
+  confidenceScore: number; // Data Reliability Score percentage
+  dataReliabilityScore?: number;
   dataQuality?: DataQualityScore;
   dataSourceTransparency?: DataSourceTransparency;
+  modelPredictions?: ModelPredictions;
+  weatherScore?: number;
+  rainfallMm?: number;
+  congestionScore?: number;
+  speedRestrictionScore?: number;
+  signalDelayScore?: number;
   lat: number;
   lng: number;
   timeline: StationStop[];

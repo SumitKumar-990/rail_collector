@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
-from app.api.trains import MONITORED_TRAINS_STATE
+from app.api.train_registry import train_registry
 
 router = APIRouter(prefix="/api", tags=["Network & Alerts"])
 
@@ -97,12 +97,12 @@ async def get_operational_alerts():
 @router.post("/simulation/event")
 async def trigger_simulation_event(req: SimulationEventRequest):
     """
-    Injects operational events by modifying the actual XGBoost feature vector components.
+    Injects operational events by modifying the train state feature vector components in TrainRegistry.
     Triggers true ML model re-inference on subsequent ETA requests.
     """
-    train = MONITORED_TRAINS_STATE.get(req.train_id)
+    train = train_registry.get_train_by_id(req.train_id)
     if not train:
-        return {"error": f"Train {req.train_id} not found"}
+        return {"error": f"Train {req.train_id} not found in dynamic registry"}
 
     if req.event_type == "rain":
         # Heavy Rain modifies weather_score and rainfall_mm features

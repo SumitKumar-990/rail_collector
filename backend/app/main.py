@@ -10,44 +10,38 @@ backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
-from app.api.trains import router as trains_router, MONITORED_TRAINS_STATE
+from app.api.trains import router as trains_router
 from app.api.network import router as network_router
+from app.api.train_registry import train_registry
 
-# Background live simulation ticker
+# Background live fleet simulation ticker
 async def live_simulation_ticker():
     """
-    Simulates realistic live train movement every 15 seconds:
-    - Train speed fluctuates within realistic limits
-    - Positions progress along routes
-    - Distance remaining decreases gradually
-    - Recomputes XGBoost ETA inference dynamically
+    [PRIORITY 1: MULTI-TRAIN FLEET SIMULATION TICKER]
+    Simulates realistic independent train movements across ALL active fleet trains every 15 seconds:
+    - Independent route progress and speed fluctuations per train
+    - Dynamic re-computation of XGBoost & Random Forest ETA predictions
     """
     while True:
         await asyncio.sleep(15)
-        for train in MONITORED_TRAINS_STATE.values():
-            if train["speed"] > 0:
-                # Progress train position slightly
-                progress_dist = (train["speed"] / 3600.0) * 15.0 # km in 15 sec
-                train["distance_covered_km"] = min(train["total_distance_km"], train["distance_covered_km"] + progress_dist)
-                
-                # Speed micro-variance
-                speed_delta = (asyncio.get_event_loop().time() % 3) - 1.5
-                train["speed"] = max(30.0, min(130.0, train["speed"] + speed_delta))
+        try:
+            train_registry.update_fleet_simulation_step()
+        except Exception as e:
+            print(f"[WARN] Fleet simulation ticker error: {e}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start background ticker
+    # Startup: Start background multi-train ticker
     ticker_task = asyncio.create_task(live_simulation_ticker())
-    print("[OK] Started RailSight AI Live Simulation Ticker (15s update interval)")
+    print(f"[OK] Started RailSight AI Fleet Simulation Ticker ({len(train_registry.active_trains)} Active Trains)")
     yield
     # Shutdown
     ticker_task.cancel()
 
-
 app = FastAPI(
     title="RailSight AI API",
     description="Real-Time Dynamic ETA Prediction System for Indian Railways (Smart India Hackathon)",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -69,8 +63,16 @@ async def root():
         "system": "RailSight AI - Real-Time Dynamic ETA Prediction System",
         "event": "Smart India Hackathon Solution",
         "status": "Operational",
-        "ml_model": "XGBoost Regressor (eta_xgboost.json)",
+        "active_train_fleet_count": len(train_registry.active_trains),
+        "ml_models": [
+            "XGBoost Regressor (eta_xgboost.json)",
+            "Random Forest Regressor (eta_random_forest.pkl)",
+            "Schedule Baseline Formula"
+        ],
         "endpoints": [
+            "GET /api/trains (All Active Trains)",
+            "POST /api/trains/batch-eta (Batch ML ETA Predictions)",
+            "GET /api/dataset/metadata (Dataset Lineage & Metadata)",
             "GET /api/trains/{train_id}/live",
             "GET /api/trains/{train_id}/eta",
             "GET /api/trains/{train_id}/eta/explanation",

@@ -1,5 +1,6 @@
 {
-  "model_type": "XGBoost Regressor",
+  "model_type": "XGBoost Regressor & Random Forest Regressor",
+  "notice": "Validated on current engineered prototype dataset",
   "feature_names": [
     "current_delay_minutes",
     "current_speed_kmph",
@@ -22,6 +23,10 @@
   ],
   "target_column": "remaining_travel_time_minutes",
   "split_strategy": "JOURNEY_AWARE_RUN_SPLIT (No Journey Overlap)",
+  "saved_models": {
+    "xgboost": "eta_xgboost.json",
+    "random_forest": "eta_random_forest.pkl"
+  },
   "metrics": {
     "schedule_baseline": {
       "mae": 11.17,
@@ -29,16 +34,16 @@
       "r2": 0.9965
     },
     "random_forest": {
-      "mae": 7.73,
+      "mae": 7.74,
       "rmse": 10.19,
       "r2": 0.9984
     },
     "xgboost": {
-      "mae": 6.91,
-      "rmse": 9.41,
-      "r2": 0.9986
+      "mae": 7.29,
+      "rmse": 10.1,
+      "r2": 0.9984
     }
   },
-  "average_eta_error_minutes": 6.91,
-  "trained_at": "2026-08-29T01:08:35.008986"
+  "average_eta_error_minutes": 7.29,
+  "trained_at": "2026-08-29T01:35:02.075112"
 }
