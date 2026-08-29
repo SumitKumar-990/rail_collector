@@ -219,3 +219,32 @@ async def get_train_eta_explanation(train_id: str):
         "factors": prediction_result["prediction_factors"],
         "total_impact_minutes": sum(f["impact_minutes"] for f in prediction_result["prediction_factors"])
     }
+
+@router.get("/trains/{train_number}/route-eta")
+async def get_train_route_eta(
+    train_number: str,
+    current_station_code: str = Query("NDLS", description="Current station code of the train"),
+    current_delay: float = Query(0.0, description="Current delay in minutes"),
+    current_status: str = Query("RUNNING", description="Running status of train")
+):
+    """
+    [CHRONOLOGICAL ETA PREDICTION & VALIDATION LAYER ENDPOINT]
+    Validates train inputs, computes predictions for every station on the route,
+    and enforces strict MONOTONIC CHRONOLOGICAL ETA ORDERING.
+    Endpoint: GET /api/trains/{train_number}/route-eta
+    """
+    st_code = current_station_code if isinstance(current_station_code, str) else "NDLS"
+    delay_val = float(current_delay) if isinstance(current_delay, (int, float)) else 0.0
+    status_val = current_status if isinstance(current_status, str) else "RUNNING"
+
+    result = predictor.predict_route_eta(
+        train_number=train_number,
+        current_station_code=st_code,
+        current_delay=delay_val,
+        current_status=status_val
+    )
+    if not result.get("valid", True):
+        raise HTTPException(status_code=400, detail=result.get("error", "Validation failed"))
+    return result
+
+
