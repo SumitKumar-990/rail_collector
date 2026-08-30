@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import joblib
 import numpy as np
@@ -7,9 +8,13 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Tuple, Optional
 import xgboost as xgb
 
-from backend.data.train_routes_dataset import get_train_route_by_number
-from backend.ml.validation_layer import DataValidationLayer
-from backend.ml.explainability import calculate_feature_attributions
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+from data.train_routes_dataset import get_train_route_by_number
+from ml.validation_layer import DataValidationLayer
+from ml.explainability import calculate_feature_attributions
 
 class ETAPredictor:
     """

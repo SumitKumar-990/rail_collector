@@ -9,7 +9,6 @@ import NetworkIntelligenceView from './components/network/NetworkIntelligenceVie
 import DelayAnalyticsView from './components/analytics/DelayAnalyticsView';
 import TrainDetailsView from './components/details/TrainDetailsView';
 import AlertsEventsView from './components/alerts/AlertsEventsView';
-import ApiPlaygroundView from './components/api/ApiPlaygroundView';
 import LiveSimulationBar from './components/simulation/LiveSimulationBar';
 
 import { useLiveTrainData } from './hooks/useLiveTrainData';
@@ -94,8 +93,6 @@ export default function App() {
           )}
 
           {activePage === 'alerts' && <AlertsEventsView />}
-
-          {activePage === 'api' && <ApiPlaygroundView />}
         </main>
       </div>
 

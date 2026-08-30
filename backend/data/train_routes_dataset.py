@@ -12,11 +12,32 @@ TRAIN_ROUTES_CATALOG: Dict[str, Dict[str, Any]] = {
         "train_name": "Howrah Rajdhani Express",
         "train_type": "Rajdhani Express",
         "zone": "ER",
+        "source": "Howrah Junction",
+        "source_code": "HWH",
+        "destination": "New Delhi",
+        "destination_code": "NDLS",
+        "route_id": "route_12301",
+        "total_distance_km": 1447.0,
+        "route": [
+            {"sequence": 1, "station_code": "HWH", "station_name": "Howrah Junction", "distance_from_source": 0.0, "scheduled_arrival": "16:50", "scheduled_departure": "16:50"},
+            {"sequence": 2, "station_code": "DHN", "station_name": "Dhanbad Junction", "distance_from_source": 259.0, "scheduled_arrival": "19:55", "scheduled_departure": "20:00"},
+            {"sequence": 3, "station_code": "GAYA", "station_name": "Gaya Junction", "distance_from_source": 458.0, "scheduled_arrival": "22:19", "scheduled_departure": "22:22"},
+            {"sequence": 4, "station_code": "DDU", "station_name": "Pt DD Upadhyaya Junction", "distance_from_source": 660.0, "scheduled_arrival": "00:45", "scheduled_departure": "00:55"},
+            {"sequence": 5, "station_code": "PRYJ", "station_name": "Prayagraj Junction", "distance_from_source": 812.0, "scheduled_arrival": "02:33", "scheduled_departure": "02:35"},
+            {"sequence": 6, "station_code": "CNB", "station_name": "Kanpur Central", "distance_from_source": 1007.0, "scheduled_arrival": "04:50", "scheduled_departure": "04:55"},
+            {"sequence": 7, "station_code": "NDLS", "station_name": "New Delhi", "distance_from_source": 1447.0, "scheduled_arrival": "10:05", "scheduled_departure": "10:05"}
+        ]
+    },
+    "12302": {
+        "train_number": "12302",
+        "train_name": "Howrah Rajdhani Express",
+        "train_type": "Rajdhani Express",
+        "zone": "ER",
         "source": "New Delhi",
         "source_code": "NDLS",
         "destination": "Howrah Junction",
         "destination_code": "HWH",
-        "route_id": "route_12301",
+        "route_id": "route_12302",
         "total_distance_km": 1447.0,
         "route": [
             {"sequence": 1, "station_code": "NDLS", "station_name": "New Delhi", "distance_from_source": 0.0, "scheduled_arrival": "16:55", "scheduled_departure": "16:55"},

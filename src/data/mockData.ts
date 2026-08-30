@@ -1,4 +1,4 @@
-import { Train, NetworkHotspot, OperationalAlert, ApiEndpoint } from '../types';
+import { Train, NetworkHotspot, OperationalAlert } from '../types';
 
 export const INITIAL_TRAINS: Train[] = [
   {
@@ -7,10 +7,10 @@ export const INITIAL_TRAINS: Train[] = [
     name: 'Howrah Rajdhani Express',
     type: 'Rajdhani',
     zone: 'ER',
-    origin: 'New Delhi',
-    originCode: 'NDLS',
-    destination: 'Howrah Junction',
-    destinationCode: 'HWH',
+    origin: 'Howrah Junction',
+    originCode: 'HWH',
+    destination: 'New Delhi',
+    destinationCode: 'NDLS',
     currentLocation: 'Kanpur Central',
     currentLocationCode: 'CNB',
     nextStation: 'Prayagraj Junction',
@@ -746,86 +746,6 @@ export const OPERATIONAL_ALERTS: OperationalAlert[] = [
     expectedImpact: '-5 minutes (Recovery)',
     timestamp: '1 hour ago',
     description: 'Interlock fault resolved by S&T team; green signal sequence restored.'
-  }
-];
-
-export const API_ENDPOINTS: ApiEndpoint[] = [
-  {
-    id: 'api-1',
-    name: 'Get Train Real-Time ETA Prediction',
-    method: 'GET',
-    path: '/api/v1/trains/{trainId}/eta',
-    description: 'Fetches AI/ML-enhanced real-time ETA predictions along with confidence metrics, delay factors, and historical comparison.',
-    queryParams: [
-      { key: 'trainId', label: 'Train Number or ID', default: '12301', required: true },
-      { key: 'includeExplainability', label: 'Include AI SHAP Factors', default: 'true', required: false }
-    ],
-    sampleResponseBody: {
-      train_id: "12301",
-      train_name: "Howrah Rajdhani Express",
-      current_location: "Kanpur Central",
-      current_speed_kmh: 92,
-      next_station: "Prayagraj Junction",
-      scheduled_eta: "18:30",
-      traditional_eta: "18:30",
-      ai_predicted_eta: "18:48",
-      delay_minutes: 18,
-      confidence_score: 0.96,
-      prediction_factors: [
-        { factor: "Downstream Congestion", impact_minutes: 8, severity: "HIGH" },
-        { factor: "Temporary Speed Restriction", impact_minutes: 5, severity: "MEDIUM" },
-        { factor: "Fog Visibility", impact_minutes: 7, severity: "MEDIUM" },
-        { factor: "Schedule Padding Buffer", impact_minutes: -2, severity: "RECOVERY" }
-      ],
-      prediction_updated_at: new Date().toISOString()
-    }
-  },
-  {
-    id: 'api-2',
-    name: 'Get Network Congestion Hotspots',
-    method: 'GET',
-    path: '/api/v1/network/congestion',
-    description: 'Retrieves active route corridor congestion bottlenecks, delay indices, and count of impacted passenger trains.',
-    queryParams: [
-      { key: 'zone', label: 'Railway Zone (e.g. NCR, ER)', default: 'NCR', required: false }
-    ],
-    sampleResponseBody: {
-      network_health_score: 82,
-      status: "Moderate",
-      total_active_trains: 2847,
-      hotspots: [
-        {
-          section: "Kanpur Central -> Prayagraj JN",
-          congestion_level: "CRITICAL",
-          avg_delay_min: 28,
-          affected_trains: 38
-        }
-      ],
-      timestamp: new Date().toISOString()
-    }
-  },
-  {
-    id: 'api-3',
-    name: 'Get Feature Attribution & Explainability',
-    method: 'GET',
-    path: '/api/v1/trains/{trainId}/explainability',
-    description: 'Returns ML model feature weights and SHAP explanations detailing why the ETA deviated from scheduled arrival.',
-    queryParams: [
-      { key: 'trainId', label: 'Train ID', default: '12301', required: true }
-    ],
-    sampleResponseBody: {
-      train_id: "12301",
-      base_scheduled_time: "18:30",
-      predicted_time: "18:48",
-      total_variance_minutes: 18,
-      model_type: "LightGBM + SpatioTemporal GNN",
-      feature_attributions: {
-        track_occupancy_density: "+8.2 min",
-        caution_orders_speed_cap: "+5.1 min",
-        weather_radar_precipitation: "+6.7 min",
-        driver_kpi_recovery_factor: "-2.0 min"
-      }
-    }
   }
 ];
 

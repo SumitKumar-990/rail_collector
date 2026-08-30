@@ -1,5 +1,9 @@
 from typing import Dict, Any, Tuple, Optional
-from backend.data.train_routes_dataset import get_train_route_by_number
+
+try:
+    from data.train_routes_dataset import get_train_route_by_number
+except ImportError:
+    from backend.data.train_routes_dataset import get_train_route_by_number
 
 VALID_STATUSES = {"NOT_STARTED", "RUNNING", "AT_STATION", "ARRIVED", "CANCELLED", "UNKNOWN"}
 

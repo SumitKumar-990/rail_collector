@@ -1,5 +1,3 @@
-import React from 'react';
-import { NavPage } from '../../types';
 import {
   LayoutDashboard,
   Activity,
@@ -8,7 +6,6 @@ import {
   BarChart3,
   TrainFront,
   BellRing,
-  Code2,
   Settings,
   Cpu,
   ChevronRight
@@ -33,8 +30,7 @@ export default function Sidebar({ activePage, onPageChange, criticalAlertCount }
       label: 'Alerts & Events',
       icon: BellRing,
       count: criticalAlertCount
-    },
-    { id: 'api' as NavPage, label: 'API Playground', icon: Code2, badge: 'v1' }
+    }
   ];
 
   return (

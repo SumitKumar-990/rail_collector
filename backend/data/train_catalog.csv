@@ -1,0 +1,51 @@
+train_number,train_name,train_type,zone,source_code,source_name,destination_code,destination_name,total_distance_km
+12301,Howrah Rajdhani Express,Rajdhani,ER,HWH,Howrah Junction,NDLS,New Delhi,1447.0
+12302,Howrah Rajdhani Express,Rajdhani,ER,NDLS,New Delhi,HWH,Howrah Junction,1447.0
+12951,Mumbai Rajdhani Express,Rajdhani,WR,MMCT,Mumbai Central,NDLS,New Delhi,1386.0
+12952,Mumbai Rajdhani Express,Rajdhani,WR,NDLS,New Delhi,MMCT,Mumbai Central,1386.0
+12002,Bhopal Shatabdi Express,Shatabdi,NCR,NDLS,New Delhi,RKMP,Rani Kamlapati,706.0
+12001,Bhopal Shatabdi Express,Shatabdi,NCR,RKMP,Rani Kamlapati,NDLS,New Delhi,706.0
+12309,Patna Tejas Rajdhani,Rajdhani,ECR,RJPB,Rajendra Nagar,NDLS,New Delhi,1002.0
+12310,Patna Tejas Rajdhani,Rajdhani,ECR,NDLS,New Delhi,RJPB,Rajendra Nagar,1002.0
+22436,Vande Bharat Express,Vande Bharat,NR,NDLS,New Delhi,BSB,Varanasi Junction,759.0
+22435,Vande Bharat Express,Vande Bharat,NR,BSB,Varanasi Junction,NDLS,New Delhi,759.0
+12259,Sealdah Duronto Express,Duronto,ER,SDAH,Sealdah,BKN,Bikaner Junction,1918.0
+12260,Sealdah Duronto Express,Duronto,ER,BKN,Bikaner Junction,SDAH,Sealdah,1918.0
+12624,Chennai Mail,Superfast,SR,TVC,Trivandrum Central,MAS,Chennai Central,918.0
+12623,Chennai Mail,Superfast,SR,MAS,Chennai Central,TVC,Trivandrum Central,918.0
+12555,Gorakhdham Express,Superfast,NER,GKP,Gorakhpur Junction,HSR,Hisar,744.0
+12556,Gorakhdham Express,Superfast,NER,HSR,Hisar,GKP,Gorakhpur Junction,744.0
+12230,Lucknow Mail,Superfast,NR,LKO,Lucknow NR,NDLS,New Delhi,493.0
+12229,Lucknow Mail,Superfast,NR,NDLS,New Delhi,LKO,Lucknow NR,493.0
+12839,Howrah Mail,Superfast,SER,HWH,Howrah Junction,MAS,Chennai Central,1660.0
+12840,Howrah Mail,Superfast,SER,MAS,Chennai Central,HWH,Howrah Junction,1660.0
+12004,Lucknow Shatabdi Express,Shatabdi,NR,NDLS,New Delhi,LKO,Lucknow NR,511.0
+12003,Lucknow Shatabdi Express,Shatabdi,NR,LKO,Lucknow NR,NDLS,New Delhi,511.0
+12424,Dibrugarh Rajdhani Express,Rajdhani,NR,NDLS,New Delhi,DBRG,Dibrugarh,2438.0
+12423,Dibrugarh Rajdhani Express,Rajdhani,NFR,DBRG,Dibrugarh,NDLS,New Delhi,2438.0
+12926,Paschim Express,Superfast,WR,ASR,Amritsar Junction,MMCT,Mumbai Central,1821.0
+12925,Paschim Express,Superfast,WR,MMCT,Mumbai Central,ASR,Amritsar Junction,1821.0
+12626,Kerala Express,Superfast,SR,NDLS,New Delhi,TVC,Trivandrum Central,3036.0
+12625,Kerala Express,Superfast,SR,TVC,Trivandrum Central,NDLS,New Delhi,3036.0
+12627,Karnataka Express,Superfast,SWR,SBC,KSR Bengaluru,NDLS,New Delhi,2406.0
+12628,Karnataka Express,Superfast,SWR,NDLS,New Delhi,SBC,KSR Bengaluru,2406.0
+12345,Saraighat Express,Superfast,ER,HWH,Howrah Junction,GHY,Guwahati,999.0
+12346,Saraighat Express,Superfast,NFR,GHY,Guwahati,HWH,Howrah Junction,999.0
+12401,Magadh Express,Superfast,NR,IPR,Islampur,NDLS,New Delhi,1065.0
+12402,Magadh Express,Superfast,NR,NDLS,New Delhi,IPR,Islampur,1065.0
+20901,Vande Bharat Express,Vande Bharat,WR,MMCT,Mumbai Central,GNC,Gandhinagar Capital,522.0
+20902,Vande Bharat Express,Vande Bharat,WR,GNC,Gandhinagar Capital,MMCT,Mumbai Central,522.0
+20607,Vande Bharat Express,Vande Bharat,SR,MAS,Chennai Central,MYS,Mysuru Junction,497.0
+20608,Vande Bharat Express,Vande Bharat,SR,MYS,Mysuru Junction,MAS,Chennai Central,497.0
+12137,Punjab Mail,Superfast,CR,CSMT,Mumbai CSMT,FZR,Firozpur Cantt,1930.0
+12138,Punjab Mail,Superfast,NR,FZR,Firozpur Cantt,CSMT,Mumbai CSMT,1930.0
+12953,August Kranti Rajdhani,Rajdhani,WR,MMCT,Mumbai Central,NZM,Hazrat Nizamuddin,1377.0
+12954,August Kranti Rajdhani,Rajdhani,WR,NZM,Hazrat Nizamuddin,MMCT,Mumbai Central,1377.0
+12431,Trivandrum Rajdhani,Rajdhani,NR,TVC,Trivandrum Central,NZM,Hazrat Nizamuddin,2848.0
+12432,Trivandrum Rajdhani,Rajdhani,NR,NZM,Hazrat Nizamuddin,TVC,Trivandrum Central,2848.0
+12723,Telangana Express,Superfast,SCR,HYB,Hyderabad Deccan,NDLS,New Delhi,1677.0
+12724,Telangana Express,Superfast,SCR,NDLS,New Delhi,HYB,Hyderabad Deccan,1677.0
+12615,Grand Trunk Express,Superfast,SR,MAS,Chennai Central,NDLS,New Delhi,2182.0
+12616,Grand Trunk Express,Superfast,SR,NDLS,New Delhi,MAS,Chennai Central,2182.0
+12801,Purushottam Express,Superfast,ECoR,PURI,Puri,NDLS,New Delhi,1865.0
+12802,Purushottam Express,Superfast,ECoR,NDLS,New Delhi,PURI,Puri,1865.0

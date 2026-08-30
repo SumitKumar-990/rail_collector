@@ -62,8 +62,8 @@ def generate_railradar_historical(output_path, dates, stations):
     trains = ['12301', '12302', '12951', '12952', '12004', '12626', '12424', '12260', '12926', '12627']
     
     routes = {
-        '12301': ['NDLS', 'CNB', 'PRYJ', 'DDU', 'GKP', 'HWH'],
-        '12302': ['HWH', 'GKP', 'DDU', 'PRYJ', 'CNB', 'NDLS'],
+        '12301': ['HWH', 'GKP', 'DDU', 'PRYJ', 'CNB', 'NDLS'],
+        '12302': ['NDLS', 'CNB', 'PRYJ', 'DDU', 'GKP', 'HWH'],
         '12951': ['BCT', 'ST', 'BRC', 'RTM', 'KOTA', 'NDLS'],
         '12952': ['NDLS', 'KOTA', 'RTM', 'BRC', 'ST', 'BCT'],
         '12004': ['NDLS', 'GZB', 'ALJN', 'TDL', 'CNB', 'LKO'],

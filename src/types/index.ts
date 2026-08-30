@@ -5,8 +5,7 @@ export type NavPage =
   | 'network'
   | 'analytics'
   | 'details'
-  | 'alerts'
-  | 'api';
+  | 'alerts';
 
 export type TrainStatus = 'on_time' | 'delayed' | 'critical' | 'approaching';
 
