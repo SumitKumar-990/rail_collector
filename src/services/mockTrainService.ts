@@ -1,4 +1,15 @@
-import { Train, NetworkHotspot, OperationalAlert, DelayFactor, DataQualityScore, DataSourceTransparency, ModelPredictions, DatasetMetadata } from '../types';
+import {
+  Train,
+  NetworkHotspot,
+  OperationalAlert,
+  StationItem,
+  BetweenTrainResult,
+  PassengerDelayExplanation,
+  CorridorDetail,
+  NetworkCongestionResponse,
+  AffectedTrain,
+  ModelPredictions
+} from '../types';
 import { INITIAL_TRAINS, NETWORK_HOTSPOTS, OPERATIONAL_ALERTS } from '../data/mockData';
 
 const API_BASE_URL = 'http://localhost:8000/api';
@@ -8,9 +19,16 @@ export class MockTrainService {
   private hotspots: NetworkHotspot[] = [...NETWORK_HOTSPOTS];
   private alerts: OperationalAlert[] = [...OPERATIONAL_ALERTS];
 
+  // Helper rounding
+  private round(val: number): number {
+    return Math.round(val * 10) / 10;
+  }
+
+  // =========================================================================
+  // 1. ALL ACTIVE FLEET TRAINS
+  // =========================================================================
   async getTrains(): Promise<Train[]> {
     try {
-      // PRIORITY 1: Fetch ALL active trains from backend FastAPI dynamic Train Registry
       const res = await fetch(`${API_BASE_URL}/trains`);
       if (res.ok) {
         const data = await res.json();
@@ -18,18 +36,21 @@ export class MockTrainService {
         
         if (activeList.length > 0) {
           // Perform batch ETA predictions across the entire fleet
-          const batchRes = await fetch(`${API_BASE_URL}/trains/batch-eta`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-          });
-
           let batchPredictionsMap: Record<string, any> = {};
-          if (batchRes.ok) {
-            const batchData = await batchRes.json();
-            for (const item of (batchData.predictions || [])) {
-              batchPredictionsMap[item.train_id] = item;
+          try {
+            const batchRes = await fetch(`${API_BASE_URL}/trains/batch-eta`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            });
+            if (batchRes.ok) {
+              const batchData = await batchRes.json();
+              for (const item of (batchData.predictions || [])) {
+                batchPredictionsMap[item.train_id] = item;
+              }
             }
+          } catch (err) {
+            // Non-blocking
           }
 
           // Map backend dynamic registry objects to frontend Train model
@@ -37,9 +58,9 @@ export class MockTrainService {
             const pred = batchPredictionsMap[t.train_id] || {};
             const existing = this.trains.find(existingT => existingT.id === t.train_id);
             const modelPreds: ModelPredictions = pred.model_predictions || {
-              schedule_baseline_minutes: round(t.current_delay_minutes * 0.7 + 120),
-              random_forest_minutes: round(t.current_delay_minutes * 0.85 + 112),
-              xgboost_minutes: round(t.current_delay_minutes * 0.75 + 105)
+              schedule_baseline_minutes: this.round(t.current_delay_minutes * 0.7 + 120),
+              random_forest_minutes: this.round(t.current_delay_minutes * 0.85 + 112),
+              xgboost_minutes: this.round(t.current_delay_minutes * 0.75 + 105)
             };
 
             return {
@@ -56,7 +77,7 @@ export class MockTrainService {
               currentLocationCode: t.current_station ? t.current_station.substring(0, 4).toUpperCase() : 'CURR',
               nextStation: t.next_station,
               nextStationCode: t.next_station ? t.next_station.substring(0, 4).toUpperCase() : 'NEXT',
-              currentSpeed: t.speed,
+              currentSpeed: t.speed || 85,
               maxSpeed: 130,
               distanceCovered: t.distance_covered_km,
               totalDistance: t.total_distance_km,
@@ -98,118 +119,262 @@ export class MockTrainService {
                 source: f.source || 'LIVE / HISTORICAL TELEMETRY',
                 description: f.category === 'congestion'
                   ? 'Track occupancy density on forward route segment'
-                  : f.category === 'speed_restriction'
-                  ? 'Caution speed order over track maintenance zone'
-                  : f.category === 'weather'
-                  ? 'Rainfall / low visibility regulation'
-                  : 'Schedule padding buffer recovery'
+                  : (f.category === 'weather' ? 'Atmospheric condition coefficient on braking curve' : 'Standard scheduled baseline')
               })) : (existing ? existing.delayFactors : []),
-              lastUpdated: 'Just now'
+              lastUpdated: new Date().toLocaleTimeString()
             };
           });
 
           this.trains = mappedTrains;
-          return [...this.trains];
+          return mappedTrains;
         }
       }
     } catch (e) {
-      // Local fallback if server offline
+      // Fallback to memory
     }
-    return [...this.trains];
+    return this.trains;
   }
 
-  async getTrainById(id: string): Promise<Train | null> {
-    const trains = await this.getTrains();
-    return trains.find(t => t.id === id || t.number === id) || null;
-  }
-
-  async getTrainETA(trainId: string): Promise<{
-    trainId: string;
-    scheduledEta: string;
-    traditionalEta: string;
-    aiPredictedEta: string;
-    remainingTravelTimeMinutes: number;
-    delayMinutes: number;
-    confidenceScore: number;
-    dataReliabilityScore: number;
-    dataQuality: DataQualityScore;
-    dataSourceTransparency: DataSourceTransparency;
-    modelPredictions: ModelPredictions;
-  }> {
+  // =========================================================================
+  // 2. PASSENGER TRAIN SEARCH
+  // =========================================================================
+  async searchTrains(query: string, limit: number = 15): Promise<any[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/trains/${trainId}/eta`);
+      const res = await fetch(`${API_BASE_URL}/trains/search?q=${encodeURIComponent(query)}&limit=${limit}`);
       if (res.ok) {
         const data = await res.json();
-        return {
-          trainId: data.train_id,
-          scheduledEta: "18:30",
-          traditionalEta: "18:30",
-          aiPredictedEta: data.predicted_eta_formatted,
-          remainingTravelTimeMinutes: data.remaining_travel_time_minutes,
-          delayMinutes: data.delay_minutes,
-          confidenceScore: Math.round((data.data_reliability_score || 0.94) * 100),
-          dataReliabilityScore: data.data_reliability_score || 0.94,
-          dataQuality: data.data_quality || { score: 0.94, estimated_telemetry: false, weather_available: true },
-          dataSourceTransparency: data.data_source_transparency || {
-            is_live_gps: true,
-            is_estimated: false,
-            is_simulated: false,
-            model_type: "XGBoost Regressor (eta_xgboost.json) + Random Forest (eta_random_forest.pkl)"
-          },
-          modelPredictions: data.model_predictions || {
-            schedule_baseline_minutes: data.schedule_baseline_minutes || 115.0,
-            random_forest_minutes: data.random_forest_minutes || 108.0,
-            xgboost_minutes: data.xgboost_minutes || 105.0
-          }
-        };
+        return data.trains || [];
       }
     } catch (e) {
-      // Local fallback
+      // Fallback search
+    }
+    const q = query.toLowerCase().trim();
+    return this.trains.filter(t => t.number.includes(q) || t.name.toLowerCase().includes(q)).slice(0, limit);
+  }
+
+  // =========================================================================
+  // 3. PASSENGER STATION SEARCH
+  // =========================================================================
+  async searchStations(query: string): Promise<StationItem[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/stations/search?q=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.stations || [];
+      }
+    } catch (e) {
+      // Fallback
+    }
+    const q = query.toLowerCase().trim();
+    const defaults: StationItem[] = [
+      { code: 'HWH', name: 'Howrah Junction', city: 'Kolkata' },
+      { code: 'RNC', name: 'Ranchi Junction', city: 'Ranchi' },
+      { code: 'NDLS', name: 'New Delhi', city: 'New Delhi' },
+      { code: 'CNB', name: 'Kanpur Central', city: 'Kanpur' },
+      { code: 'PRYJ', name: 'Prayagraj Junction', city: 'Prayagraj' },
+      { code: 'MMCT', name: 'Mumbai Central', city: 'Mumbai' },
+      { code: 'DGR', name: 'Durgapur', city: 'Durgapur' },
+      { code: 'DHN', name: 'Dhanbad Junction', city: 'Dhanbad' }
+    ];
+    return defaults.filter(s => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.city && s.city.toLowerCase().includes(q)));
+  }
+
+  // =========================================================================
+  // 4. FIND TRAINS BETWEEN STATIONS
+  // =========================================================================
+  async getTrainsBetween(fromStation: string, toStation: string): Promise<BetweenTrainResult[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/trains/between?from=${encodeURIComponent(fromStation)}&to=${encodeURIComponent(toStation)}`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.trains || [];
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return [
+      {
+        train_number: '12019',
+        train_name: 'Howrah - Ranchi Shatabdi Express',
+        type: 'Shatabdi Express',
+        zone: 'ER',
+        source_station_code: fromStation || 'HWH',
+        source_station_name: 'Howrah Junction',
+        destination_station_code: toStation || 'RNC',
+        destination_station_name: 'Ranchi Junction',
+        departure_time: '06:05',
+        arrival_time: '13:15',
+        duration: '7h 10m',
+        total_distance_km: 421.0,
+        runs_on: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      },
+      {
+        train_number: '12301',
+        train_name: 'Howrah Rajdhani Express',
+        type: 'Rajdhani Express',
+        zone: 'ER',
+        source_station_code: fromStation || 'HWH',
+        source_station_name: 'Howrah Junction',
+        destination_station_code: toStation || 'NDLS',
+        destination_station_name: 'New Delhi',
+        departure_time: '16:50',
+        arrival_time: '10:05',
+        duration: '17h 15m',
+        total_distance_km: 1447.0,
+        runs_on: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      }
+    ];
+  }
+
+  // =========================================================================
+  // 5. GET FULL TRAIN DETAILS FOR ANY TRAIN IN THE DIRECTORY
+  // =========================================================================
+  async getTrainDetails(trainNumber: string): Promise<Train> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}`);
+      if (res.ok) {
+        const data = await res.json();
+        const existing = this.trains.find(t => t.number === trainNumber || t.id === trainNumber);
+        if (existing) {
+          return existing;
+        }
+
+        const newTrain: Train = {
+          id: data.train_number || trainNumber,
+          number: data.train_number || trainNumber,
+          name: data.train_name || `Train ${trainNumber}`,
+          type: data.train_type || 'Express',
+          origin: data.source_station_name || 'Origin Station',
+          originCode: data.source_station_code || 'ORG',
+          destination: data.destination_station_name || 'Destination Station',
+          destinationCode: data.destination_station_code || 'DEST',
+          currentStation: data.source_station_name || 'Origin',
+          nextStation: data.destination_station_name || 'Destination',
+          nextStationCode: data.destination_station_code || 'DEST',
+          scheduledDeparture: data.departure_time || '06:00',
+          scheduledArrival: data.arrival_time || '14:00',
+          scheduledEta: data.arrival_time || '14:00',
+          aiPredictedEta: data.arrival_time || '14:15',
+          delayMinutes: 0,
+          status: 'on-time',
+          currentSpeed: 0,
+          maxSpeed: 110,
+          totalDistance: data.total_distance_km || 500,
+          distanceCovered: 0,
+          confidence: 'High',
+          congestionScore: 0.2,
+          weatherScore: 0.1,
+          rainfallMm: 0,
+          speedRestrictionScore: 0,
+          signalDelayScore: 0,
+          lat: 23.3441,
+          lng: 85.3096,
+          timeline: data.stations && data.stations.length > 0 ? data.stations.map((s: any, idx: number) => ({
+            id: `st-${idx}`,
+            stationName: s.station_name,
+            stationCode: s.station_code,
+            scheduledArrival: s.scheduled_arrival || '--',
+            scheduledDeparture: s.scheduled_departure || '--',
+            predictedArrival: s.scheduled_arrival || '--',
+            predictedDeparture: s.scheduled_departure || '--',
+            delayMinutes: 0,
+            distanceFromOrigin: s.distance_km || idx * 40,
+            status: idx === 0 ? 'completed' : (idx === 1 ? 'current' : 'upcoming'),
+            platform: '1'
+          })) : [
+            { id: 's1', stationName: data.source_station_name || 'Origin', stationCode: data.source_station_code || 'ORG', scheduledArrival: data.departure_time || '06:00', scheduledDeparture: data.departure_time || '06:00', predictedArrival: data.departure_time || '06:00', predictedDeparture: data.departure_time || '06:00', delayMinutes: 0, distanceFromOrigin: 0, status: 'completed' },
+            { id: 's2', stationName: data.destination_station_name || 'Destination', stationCode: data.destination_station_code || 'DEST', scheduledArrival: data.arrival_time || '14:00', scheduledDeparture: data.arrival_time || '14:00', predictedArrival: data.arrival_time || '14:00', predictedDeparture: data.arrival_time || '14:00', delayMinutes: 0, distanceFromOrigin: data.total_distance_km || 500, status: 'upcoming' }
+          ],
+          delayFactors: [
+            { id: 'df-1', name: 'Section Congestion', category: 'congestion', impactMinutes: 0, type: 'gain', icon: '🟢', source: 'INDIAN RAILWAYS DIRECTORY', description: 'Standard baseline schedule' }
+          ],
+          lastUpdated: new Date().toLocaleTimeString()
+        };
+
+        // Cache into this.trains
+        this.trains.push(newTrain);
+        return newTrain;
+      }
+    } catch (e) {
+      // Fallback
     }
 
-    const train = await this.getTrainById(trainId);
-    if (!train) throw new Error(`Train ${trainId} not found`);
+    const found = this.trains.find(t => t.number === trainNumber || t.id === trainNumber);
+    if (found) return found;
 
     return {
-      trainId: train.id,
-      scheduledEta: train.scheduledEta,
-      traditionalEta: train.traditionalEta,
-      aiPredictedEta: train.aiPredictedEta,
-      remainingTravelTimeMinutes: train.remainingTravelTimeMinutes || 105,
-      delayMinutes: train.delayMinutes,
-      confidenceScore: train.confidenceScore,
-      dataReliabilityScore: train.dataReliabilityScore || 0.94,
-      dataQuality: train.dataQuality || { score: 0.94, estimated_telemetry: false, weather_available: true },
-      dataSourceTransparency: train.dataSourceTransparency || {
-        is_live_gps: true,
-        is_estimated: false,
-        is_simulated: false,
-        model_type: "XGBoost Regressor (eta_xgboost.json) + Random Forest (eta_random_forest.pkl)"
-      },
-      modelPredictions: train.modelPredictions || {
-        schedule_baseline_minutes: 115.0,
-        random_forest_minutes: 108.0,
-        xgboost_minutes: 105.0
-      }
+      id: trainNumber,
+      number: trainNumber,
+      name: `Train ${trainNumber}`,
+      type: 'Express',
+      origin: 'Origin Station',
+      originCode: 'ORG',
+      destination: 'Destination Station',
+      destinationCode: 'DEST',
+      currentStation: 'Origin Station',
+      nextStation: 'Destination Station',
+      nextStationCode: 'DEST',
+      scheduledDeparture: '06:00',
+      scheduledArrival: '14:00',
+      scheduledEta: '14:00',
+      aiPredictedEta: '14:10',
+      delayMinutes: 0,
+      status: 'on-time',
+      currentSpeed: 0,
+      maxSpeed: 110,
+      totalDistance: 500,
+      distanceCovered: 0,
+      confidence: 'Medium',
+      congestionScore: 0.2,
+      weatherScore: 0.1,
+      rainfallMm: 0,
+      speedRestrictionScore: 0,
+      signalDelayScore: 0,
+      lat: 23.3441,
+      lng: 85.3096,
+      timeline: [],
+      delayFactors: [],
+      lastUpdated: new Date().toLocaleTimeString()
     };
   }
 
-  async triggerSimulationEvent(trainId: string, eventType: string, active: boolean) {
+  // =========================================================================
+  // 6. LIVE STATUS FOR SPECIFIC TRAIN
+  // =========================================================================
+  async getLiveTrainStatus(trainNumber: string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/simulation/event`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ train_id: trainId, event_type: eventType, active })
-      });
-      return await res.json();
+      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/live`);
+      if (res.ok) {
+        return await res.json();
+      }
     } catch (e) {
-      return null;
+      // Fallback
     }
+    const found = this.trains.find(t => t.number === trainNumber || t.id === trainNumber);
+    if (found) {
+      return {
+        train_number: found.number,
+        train_name: found.name,
+        is_live_available: true,
+        running_status: 'RUNNING',
+        current_location: found.currentLocation,
+        previous_station: found.origin,
+        next_station: found.nextStation,
+        destination: found.destination,
+        current_delay_minutes: found.delayMinutes,
+        current_speed_kmph: found.currentSpeed,
+        last_updated: new Date().toLocaleTimeString()
+      };
+    }
+    return null;
   }
 
-  async getDatasetMetadata(): Promise<DatasetMetadata | null> {
+  // =========================================================================
+  // 6. TRAIN SCHEDULE TIMELINE
+  // =========================================================================
+  async getTrainSchedule(trainNumber: string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/dataset/metadata`);
+      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/schedule`);
       if (res.ok) {
         return await res.json();
       }
@@ -219,60 +384,219 @@ export class MockTrainService {
     return null;
   }
 
-  async getPredictionExplanation(trainId: string): Promise<{
-    delayFactors: DelayFactor[];
-    totalImpact: number;
-    confidenceScore: number;
-    explanationType: string;
-  }> {
+  // =========================================================================
+  // 7. TRAIN ROUTE GEOMETRY
+  // =========================================================================
+  async getTrainRoute(trainNumber: string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/trains/${trainId}/eta/explanation`);
+      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/route`);
       if (res.ok) {
-        const data = await res.json();
-        const delayFactors: DelayFactor[] = data.factors.map((f: any, idx: number) => ({
-          id: `f-${idx}`,
-          name: f.factor,
-          category: f.category,
-          impactMinutes: f.impact_minutes,
-          type: f.impact_minutes > 0 ? 'delay' : 'gain',
-          icon: f.impact_minutes > 0 ? (f.impact_minutes > 10 ? '🔴' : '🟠') : '🟢',
-          source: f.source || 'LIVE / HISTORICAL TELEMETRY',
-          description: f.category === 'congestion'
-            ? 'Track occupancy density on forward route segment'
-            : f.category === 'speed_restriction'
-            ? 'Caution speed order over track maintenance zone'
-            : f.category === 'weather'
-            ? 'Rainfall / low visibility regulation'
-            : f.category === 'signal'
-            ? 'Signal clearance interlock hold'
-            : 'Schedule padding buffer recovery'
-        }));
-
-        return {
-          delayFactors,
-          totalImpact: data.total_impact_minutes,
-          confidenceScore: Math.round((data.prediction.reliability_score || 0.94) * 100),
-          explanationType: data.explanation_type || "Operational ETA Impact Analysis"
-        };
+        return await res.json();
       }
     } catch (e) {
       // Fallback
     }
+    return null;
+  }
 
-    const train = await this.getTrainById(trainId);
-    if (!train) throw new Error(`Train ${trainId} not found`);
-    const totalImpact = train.delayFactors.reduce((acc, df) => acc + df.impactMinutes, 0);
+  // =========================================================================
+  // 8. AI ETA PREDICTION
+  // =========================================================================
+  async getTrainEta(trainNumber: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/eta`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return null;
+  }
 
+  // =========================================================================
+  // 7. PASSENGER HUMAN-READABLE DELAY EXPLANATION
+  // =========================================================================
+  async getPassengerEtaExplanation(trainNumber: string): Promise<PassengerDelayExplanation> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/eta/explanation`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      // Fallback
+    }
     return {
-      delayFactors: train.delayFactors,
-      totalImpact,
-      confidenceScore: train.confidenceScore,
-      explanationType: "Operational ETA Impact Analysis"
+      train_number: trainNumber,
+      human_summary: 'Heavy rail traffic ahead. Your arrival may be affected by approximately 5–10 minutes.',
+      has_advisory: true,
+      confidence_percentage: 91,
+      breakdown: [
+        { factor: 'Heavy rail traffic ahead', impact_minutes: 6, icon: '🚦' },
+        { factor: 'Weather & visibility conditions', impact_minutes: 2, icon: '🌧' },
+        { factor: 'Current running delay', impact_minutes: 3, icon: '⏱' }
+      ]
     };
+  }
+
+  // =========================================================================
+  // 8. OFFICER NETWORK CONGESTION INTELLIGENCE
+  // =========================================================================
+  async getNetworkCongestion(): Promise<NetworkCongestionResponse> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/network/congestion`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return {
+      timestamp: new Date().toISOString(),
+      network_health_score: 82,
+      overall_status: 'Moderate Congestion',
+      critical_corridors_count: 1,
+      high_corridors_count: 2,
+      corridors: [
+        {
+          corridor_id: 'corridor-cnb-pryj',
+          corridor_name: 'Kanpur Central → Prayagraj Junction',
+          from_station_code: 'CNB',
+          to_station_code: 'PRYJ',
+          zone: 'NCR',
+          length_km: 195.0,
+          congestion_score: 84.0,
+          congestion_level: 'CRITICAL',
+          congestion_color: 'red',
+          active_trains_count: 28,
+          average_delay_minutes: 16.0,
+          trend: 'Increasing',
+          ai_assessment: 'Severe track occupancy ahead. ETA disruption and signal holds likely.',
+          affected_trains: [
+            { train_number: '12301', train_name: 'Howrah Rajdhani Express', current_delay_minutes: 18.0, predicted_eta_impact_minutes: 22, risk_level: 'High' },
+            { train_number: '12309', train_name: 'Patna Tejas Rajdhani', current_delay_minutes: 32.0, predicted_eta_impact_minutes: 28, risk_level: 'High' },
+            { train_number: '22436', train_name: 'Vande Bharat Express', current_delay_minutes: 4.0, predicted_eta_impact_minutes: 8, risk_level: 'Low' }
+          ]
+        },
+        {
+          corridor_id: 'corridor-mtj-agc',
+          corridor_name: 'Mathura Junction → Agra Cantt',
+          from_station_code: 'MTJ',
+          to_station_code: 'AGC',
+          zone: 'NCR',
+          length_km: 54.0,
+          congestion_score: 65.0,
+          congestion_level: 'HIGH',
+          congestion_color: 'orange',
+          active_trains_count: 19,
+          average_delay_minutes: 12.0,
+          trend: 'Stable',
+          ai_assessment: 'Heavy rail traffic detected. Sectional speed reduced; moderate delay propagation.',
+          affected_trains: [
+            { train_number: '12002', train_name: 'Bhopal Shatabdi Express', current_delay_minutes: 2.0, predicted_eta_impact_minutes: 6, risk_level: 'Low' }
+          ]
+        },
+        {
+          corridor_id: 'corridor-bwn-dgr',
+          corridor_name: 'Barddhaman → Durgapur / Asansol',
+          from_station_code: 'BWN',
+          to_station_code: 'ASN',
+          zone: 'ER',
+          length_km: 105.0,
+          congestion_score: 55.0,
+          congestion_level: 'MODERATE',
+          congestion_color: 'yellow',
+          active_trains_count: 14,
+          average_delay_minutes: 8.0,
+          trend: 'Stable',
+          ai_assessment: 'Steady traffic flow with minor junction queueing.',
+          affected_trains: [
+            { train_number: '12019', train_name: 'Howrah - Ranchi Shatabdi Express', current_delay_minutes: 8.0, predicted_eta_impact_minutes: 7, risk_level: 'Medium' }
+          ]
+        },
+        {
+          corridor_id: 'corridor-st-brc',
+          corridor_name: 'Surat → Vadodara Junction',
+          from_station_code: 'ST',
+          to_station_code: 'BRC',
+          zone: 'WR',
+          length_km: 130.0,
+          congestion_score: 22.0,
+          congestion_level: 'LOW',
+          congestion_color: 'emerald',
+          active_trains_count: 11,
+          average_delay_minutes: 3.0,
+          trend: 'Decreasing',
+          ai_assessment: 'Optimal throughput. Clear line with minimal delay propagation.',
+          affected_trains: []
+        }
+      ]
+    };
+  }
+
+  // =========================================================================
+  // 9. OFFICER AFFECTED TRAINS LIST
+  // =========================================================================
+  async getAffectedTrains(): Promise<AffectedTrain[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/network/affected-trains`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.affected_trains || [];
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return [
+      { train_number: '12309', train_name: 'Patna Tejas Rajdhani', current_delay_minutes: 32.0, predicted_eta_impact_minutes: 28, risk_level: 'High', congestion_score: 84 },
+      { train_number: '12301', train_name: 'Howrah Rajdhani Express', current_delay_minutes: 18.0, predicted_eta_impact_minutes: 22, risk_level: 'High', congestion_score: 84 },
+      { train_number: '12259', train_name: 'Sealdah Duronto Express', current_delay_minutes: 15.0, predicted_eta_impact_minutes: 14, risk_level: 'Medium', congestion_score: 55 },
+      { train_number: '12019', train_name: 'Howrah Ranchi Shatabdi', current_delay_minutes: 8.0, predicted_eta_impact_minutes: 7, risk_level: 'Medium', congestion_score: 55 }
+    ];
+  }
+
+  // =========================================================================
+  // 10. LARGE-SCALE LIVE TRAIN MAP SNAPSHOT FOR OFFICERS
+  // =========================================================================
+  async getNetworkLiveSnapshot(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/network/live`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.trains || [];
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return this.trains;
+  }
+
+  // =========================================================================
+  // 10. SIMULATION TRIGGER
+  // =========================================================================
+  async triggerSimulationEvent(trainId: string, eventType: string, active: boolean) {
+    try {
+      await fetch(`${API_BASE_URL}/simulation/event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          train_id: trainId,
+          event_type: eventType,
+          active: active
+        })
+      });
+    } catch (e) {
+      // Offline fallback
+    }
+  }
+
+  getHotspots(): NetworkHotspot[] {
+    return this.hotspots;
+  }
+
+  getAlerts(): OperationalAlert[] {
+    return this.alerts;
   }
 }
 
 export const mockTrainService = new MockTrainService();
-function round(num: number): number {
-  return Math.round(num * 10) / 10;
-}

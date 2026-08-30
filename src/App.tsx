@@ -2,6 +2,13 @@ import React, { useState } from 'react';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 
+// Passenger Experience Components
+import PassengerHome from './components/passenger/PassengerHome';
+import PassengerTrainTracker from './components/passenger/PassengerTrainTracker';
+import BetweenTrainsResults from './components/passenger/BetweenTrainsResults';
+
+// Officer Experience Components
+import OfficerCommandCenter from './components/officer/OfficerCommandCenter';
 import OverviewDashboard from './components/overview/OverviewDashboard';
 import LiveTrainMonitor from './components/monitor/LiveTrainMonitor';
 import EtaPredictionsView from './components/predictions/EtaPredictionsView';
@@ -13,10 +20,14 @@ import LiveSimulationBar from './components/simulation/LiveSimulationBar';
 
 import { useLiveTrainData } from './hooks/useLiveTrainData';
 import { OPERATIONAL_ALERTS } from './data/mockData';
-import { NavPage } from './types';
+import { NavPage, UserRoleMode } from './types';
 
 export default function App() {
-  const [activePage, setActivePage] = useState<NavPage>('overview');
+  const [roleMode, setRoleMode] = useState<UserRoleMode>('passenger');
+  const [passengerView, setPassengerView] = useState<'home' | 'tracker' | 'between'>('home');
+  const [betweenSearchStations, setBetweenSearchStations] = useState<{ from: string; to: string }>({ from: 'HWH', to: 'RNC' });
+
+  const [officerPage, setOfficerPage] = useState<NavPage>('overview');
 
   const {
     trains,
@@ -31,72 +42,130 @@ export default function App() {
 
   const criticalAlertCount = OPERATIONAL_ALERTS.filter(a => a.severity === 'critical').length;
 
+  const handleSelectTrainFromPassenger = (trainId: string) => {
+    setSelectedTrainId(trainId);
+    setPassengerView('tracker');
+  };
+
+  const handleSearchBetweenFromPassenger = (fromCode: string, toCode: string) => {
+    setBetweenSearchStations({ from: fromCode, to: toCode });
+    setPassengerView('between');
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex font-sans antialiased">
-      {/* 1. PERSISTENT LEFT SIDEBAR */}
-      <Sidebar
-        activePage={activePage}
-        onPageChange={setActivePage}
-        criticalAlertCount={criticalAlertCount}
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans antialiased">
+      {/* 1. TOP GLOBAL HEADER WITH ROLE SWITCHER */}
+      <Header
+        roleMode={roleMode}
+        onRoleChange={(newRole) => {
+          setRoleMode(newRole);
+          if (newRole === 'passenger') {
+            setPassengerView('home');
+          }
+        }}
+        activePage={officerPage}
+        trains={trains}
+        selectedTrain={selectedTrain}
+        onSelectTrain={(tId) => {
+          setSelectedTrainId(tId);
+          if (roleMode === 'passenger') {
+            setPassengerView('tracker');
+          } else {
+            setOfficerPage('details');
+          }
+        }}
+        onNavigateToPassengerHome={() => {
+          setRoleMode('passenger');
+          setPassengerView('home');
+        }}
+        lastUpdated={simulationState.lastTickTimestamp}
       />
 
-      {/* MAIN CONTAINER (OFFSET BY SIDEBAR WIDTH W-64 = 16REM) */}
-      <div className="flex-1 ml-64 flex flex-col min-w-0">
-        {/* 2. TOP HEADER */}
-        <Header
-          activePage={activePage}
-          trains={trains}
-          selectedTrain={selectedTrain}
-          onSelectTrain={setSelectedTrainId}
-          onNavigateToDetails={() => setActivePage('details')}
-          lastUpdated={simulationState.lastTickTimestamp}
-        />
-
-        {/* 3. DYNAMIC PAGE CONTENT VIEW */}
-        <main className="p-8 flex-1 max-w-7xl w-full mx-auto space-y-6">
-          {activePage === 'overview' && (
-            <OverviewDashboard
-              trains={trains}
-              selectedTrain={selectedTrain}
-              onSelectTrain={setSelectedTrainId}
-              onNavigatePage={setActivePage}
+      {/* 2. BODY CONTAINER BASED ON ROLE */}
+      {roleMode === 'passenger' ? (
+        /* PASSENGER EXPERIENCE CONTAINER */
+        <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+          {passengerView === 'home' && (
+            <PassengerHome
+              onSelectTrain={handleSelectTrainFromPassenger}
+              onSearchBetween={handleSearchBetweenFromPassenger}
             />
           )}
 
-          {activePage === 'monitor' && (
-            <LiveTrainMonitor
-              trains={trains}
-              onSelectTrain={setSelectedTrainId}
-              onNavigateToDetails={() => setActivePage('details')}
-            />
-          )}
-
-          {activePage === 'predictions' && (
-            <EtaPredictionsView
-              trains={trains}
-              selectedTrain={selectedTrain}
-              onSelectTrain={setSelectedTrainId}
-              onNavigateToDetails={() => setActivePage('details')}
-            />
-          )}
-
-          {activePage === 'network' && <NetworkIntelligenceView />}
-
-          {activePage === 'analytics' && <DelayAnalyticsView />}
-
-          {activePage === 'details' && (
-            <TrainDetailsView
+          {passengerView === 'tracker' && (
+            <PassengerTrainTracker
               train={selectedTrain}
-              trains={trains}
-              onSelectTrain={setSelectedTrainId}
+              onBackToSearch={() => setPassengerView('home')}
+              onSelectTrain={handleSelectTrainFromPassenger}
             />
           )}
 
-          {activePage === 'alerts' && <AlertsEventsView />}
+          {passengerView === 'between' && (
+            <BetweenTrainsResults
+              fromCode={betweenSearchStations.from}
+              toCode={betweenSearchStations.to}
+              onSelectTrain={handleSelectTrainFromPassenger}
+              onBackToSearch={() => setPassengerView('home')}
+            />
+          )}
         </main>
-      </div>
+      ) : (
+        /* OFFICER NETWORK COMMAND CENTER CONTAINER (WITH SIDEBAR) */
+        <div className="flex-1 flex min-w-0">
+          {/* Officer Sidebar */}
+          <Sidebar
+            activePage={officerPage}
+            onPageChange={setOfficerPage}
+            criticalAlertCount={criticalAlertCount}
+          />
 
-      {/* 4. FLOATING SIMULATION ENGINE CONTROLLER */}
+          {/* Officer Main Content (Offset by Sidebar W-64) */}
+          <main className="flex-1 ml-64 p-8 max-w-7xl w-full mx-auto space-y-6 min-w-0">
+            {officerPage === 'overview' && (
+              <OfficerCommandCenter
+                trains={trains}
+                onSelectTrain={(tId) => {
+                  setSelectedTrainId(tId);
+                  setOfficerPage('details');
+                }}
+              />
+            )}
+
+            {officerPage === 'monitor' && (
+              <LiveTrainMonitor
+                trains={trains}
+                onSelectTrain={setSelectedTrainId}
+                onNavigateToDetails={() => setOfficerPage('details')}
+              />
+            )}
+
+            {officerPage === 'predictions' && (
+              <EtaPredictionsView
+                trains={trains}
+                selectedTrain={selectedTrain}
+                onSelectTrain={setSelectedTrainId}
+                onNavigateToDetails={() => setOfficerPage('details')}
+              />
+            )}
+
+            {officerPage === 'network' && <NetworkIntelligenceView />}
+
+            {officerPage === 'analytics' && <DelayAnalyticsView />}
+
+            {officerPage === 'details' && (
+              <TrainDetailsView
+                train={selectedTrain}
+                trains={trains}
+                onSelectTrain={setSelectedTrainId}
+              />
+            )}
+
+            {officerPage === 'alerts' && <AlertsEventsView />}
+          </main>
+        </div>
+      )}
+
+      {/* 3. FLOATING SIMULATION ENGINE CONTROLLER (FOR SIH LIVE DEMO) */}
       <LiveSimulationBar
         simulationState={simulationState}
         onToggleEvent={toggleEvent}

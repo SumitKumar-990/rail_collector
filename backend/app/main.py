@@ -7,8 +7,22 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Ensure backend directory is in sys.path
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+root_dir = os.path.dirname(backend_dir)
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
+
+# Load environment variables from .env if exists
+env_path = os.path.join(root_dir, ".env")
+if os.path.exists(env_path):
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+    except Exception as e:
+        print(f"[WARN] Error reading .env: {e}")
 
 from app.api.trains import router as trains_router
 from app.api.network import router as network_router

@@ -14,11 +14,34 @@ export function useLiveTrainData() {
     simulationSpeed: 1,
     lastTickTimestamp: new Date().toLocaleTimeString()
   });
+  const [activeTrain, setActiveTrain] = useState<Train | null>(null);
   const [toastNotification, setToastNotification] = useState<string | null>(null);
 
+  // Dynamically load any train from the 11,113+ dataset when selected
+  useEffect(() => {
+    let isMounted = true;
+    const existing = trains.find(t => t.id === selectedTrainId || t.number === selectedTrainId);
+    if (!existing && selectedTrainId) {
+      mockTrainService.getTrainDetails(selectedTrainId).then(fetched => {
+        if (isMounted && fetched) {
+          setActiveTrain(fetched);
+          setTrains(prev => {
+            if (!prev.some(t => t.id === fetched.id || t.number === fetched.number)) {
+              return [...prev, fetched];
+            }
+            return prev;
+          });
+        }
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedTrainId, trains]);
+
   const selectedTrain = useMemo(() => {
-    return trains.find(t => t.id === selectedTrainId) || trains[0];
-  }, [trains, selectedTrainId]);
+    return trains.find(t => t.id === selectedTrainId || t.number === selectedTrainId) || activeTrain || trains[0];
+  }, [trains, selectedTrainId, activeTrain]);
 
   // Handle Event Toggles with backend FastAPI synchronization
   const toggleEvent = useCallback((eventKey: 'rain' | 'congestion' | 'signal' | 'recovery') => {
