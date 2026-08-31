@@ -13,16 +13,62 @@ export type TrainStatus = 'on_time' | 'delayed' | 'critical' | 'approaching';
 
 export interface StationStop {
   id: string;
+  sequence?: number;
   stationName: string;
   stationCode: string;
   scheduledArrival: string;
   scheduledDeparture: string;
+  actualArrival?: string;
+  actualDeparture?: string;
   predictedArrival: string;
   predictedDeparture: string;
   delayMinutes: number;
   distanceFromOrigin: number; // km
-  status: 'completed' | 'current' | 'upcoming';
+  distanceKm?: number;
+  status: 'DEPARTED' | 'AT_STATION' | 'APPROACHING' | 'UPCOMING' | 'PASSED' | 'TERMINUS' | 'completed' | 'current' | 'upcoming';
   platform?: string;
+  isHalt?: boolean;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface LiveTrainState {
+  train_number: string;
+  train_name: string;
+  journey_date: string;
+  source_station_name: string;
+  source_station_code: string;
+  destination_station_name: string;
+  destination_station_code: string;
+  is_live_available: boolean;
+  running_status: string;
+  current_location: string;
+  current_segment?: string;
+  current_station: string;
+  previous_station: string;
+  previous_station_code: string;
+  next_station: string;
+  next_station_code: string;
+  destination: string;
+  destination_code: string;
+  current_delay_minutes: number;
+  current_speed_kmph: number;
+  latitude: number;
+  longitude: number;
+  distance_covered_km: number;
+  total_distance_km: number;
+  distance_remaining_km: number;
+  journey_progress_pct: number;
+  segment_progress_pct: number;
+  total_halts: number;
+  scheduled_duration: string;
+  predicted_destination_eta: string;
+  predicted_destination_delay_minutes: number;
+  confidence_percentage: number;
+  stations: StationStop[];
+  last_updated: string;
+  data_source: string;
+  is_demo?: boolean;
 }
 
 export interface DelayFactor {

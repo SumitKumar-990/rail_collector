@@ -26,10 +26,10 @@ export default function PassengerHome({ onSelectTrain, onSearchBetween }: Passen
 
   // Quick Trains (Kept strictly as convenient shortcuts)
   const popularTrains = [
+    { number: '10103', name: 'Mandovi Express', route: 'CSMT → MAO', badge: 'Live Konkan Tracker' },
     { number: '12019', name: 'Howrah - Ranchi Shatabdi', route: 'HWH → RNC', badge: 'Active Live' },
     { number: '12301', name: 'Howrah Rajdhani Express', route: 'HWH → NDLS', badge: 'High-Speed' },
     { number: '22436', name: 'Vande Bharat Express', route: 'NDLS → BSB', badge: 'Semi-High Speed' },
-    { number: '12002', name: 'Bhopal Shatabdi Express', route: 'NDLS → RKMP', badge: 'On-Time' },
     { number: '12951', name: 'Mumbai Rajdhani Express', route: 'MMCT → NDLS', badge: 'Trunk Route' }
   ];
 
