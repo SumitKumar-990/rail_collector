@@ -147,6 +147,57 @@ export const INITIAL_TRAINS: Train[] = [
     ]
   },
   {
+    id: '12019',
+    number: '12019',
+    name: 'Howrah - Ranchi Shatabdi Express',
+    type: 'Shatabdi',
+    zone: 'ER',
+    origin: 'Howrah Jn.',
+    originCode: 'HWH',
+    destination: 'Ranchi',
+    destinationCode: 'RNC',
+    currentLocation: 'Arrived at Ranchi (RNC)',
+    currentLocationCode: 'RNC',
+    nextStation: 'Ranchi [Terminus]',
+    nextStationCode: 'RNC',
+    currentSpeed: 0,
+    maxSpeed: 130,
+    distanceCovered: 436,
+    totalDistance: 436,
+    scheduledEta: '13:15',
+    traditionalEta: '13:15',
+    aiPredictedEta: '13:15 (Arrived)',
+    delayMinutes: 0,
+    status: 'on_time',
+    confidenceScore: 98,
+    lat: 23.3441,
+    lng: 85.3096,
+    lastUpdated: 'Just now',
+    timeline: [
+      { id: 'st-hwh', sequence: 1, stationName: 'Howrah Jn.', stationCode: 'HWH', scheduledArrival: '06:05', scheduledDeparture: '06:05', predictedArrival: '06:05', predictedDeparture: '06:05', delayMinutes: 0, distanceFromOrigin: 0, status: 'completed', platform: 'PF 10' },
+      { id: 'st-dgr', sequence: 2, stationName: 'Durgapur', stationCode: 'DGR', scheduledArrival: '07:48', scheduledDeparture: '07:50', predictedArrival: '07:48', predictedDeparture: '07:50', delayMinutes: 0, distanceFromOrigin: 157, status: 'completed', platform: 'PF 3' },
+      { id: 'st-rng', sequence: 3, stationName: 'Rani Ganj', stationCode: 'RNG', scheduledArrival: '08:05', scheduledDeparture: '08:06', predictedArrival: '08:05', predictedDeparture: '08:06', delayMinutes: 0, distanceFromOrigin: 181, status: 'completed', platform: 'PF 2' },
+      { id: 'st-asn', sequence: 4, stationName: 'Asansol Main', stationCode: 'ASN', scheduledArrival: '08:22', scheduledDeparture: '08:24', predictedArrival: '08:22', predictedDeparture: '08:24', delayMinutes: 0, distanceFromOrigin: 199, status: 'completed', platform: 'PF 4' },
+      { id: 'st-dhn', sequence: 5, stationName: 'Dhanbad Jn.', stationCode: 'DHN', scheduledArrival: '09:20', scheduledDeparture: '09:25', predictedArrival: '09:20', predictedDeparture: '09:25', delayMinutes: 0, distanceFromOrigin: 258, status: 'completed', platform: 'PF 1' },
+      { id: 'st-gmo', sequence: 6, stationName: 'NSC Bose J Gomoh', stationCode: 'GMO', scheduledArrival: '09:52', scheduledDeparture: '10:12', predictedArrival: '09:52', predictedDeparture: '10:12', delayMinutes: 0, distanceFromOrigin: 287, status: 'completed', platform: 'PF 3' },
+      { id: 'st-crp', sequence: 7, stationName: 'Chandrapura', stationCode: 'CRP', scheduledArrival: '10:34', scheduledDeparture: '10:36', predictedArrival: '10:34', predictedDeparture: '10:36', delayMinutes: 0, distanceFromOrigin: 304, status: 'completed', platform: 'PF 1' },
+      { id: 'st-bksc', sequence: 8, stationName: 'Bokaro Steel City', stationCode: 'BKSC', scheduledArrival: '11:05', scheduledDeparture: '11:07', predictedArrival: '11:05', predictedDeparture: '11:07', delayMinutes: 0, distanceFromOrigin: 319, status: 'completed', platform: 'PF 2' },
+      { id: 'st-muri', sequence: 9, stationName: 'Muri', stationCode: 'MURI', scheduledArrival: '11:56', scheduledDeparture: '11:58', predictedArrival: '11:56', predictedDeparture: '11:58', delayMinutes: 0, distanceFromOrigin: 371, status: 'completed', platform: 'PF 1' },
+      { id: 'st-rnc', sequence: 10, stationName: 'Ranchi', stationCode: 'RNC', scheduledArrival: '13:15', scheduledDeparture: '13:15', predictedArrival: '13:15', predictedDeparture: '13:15', delayMinutes: 0, distanceFromOrigin: 436, status: 'completed', platform: 'PF 1' }
+    ],
+    delayFactors: [
+      {
+        id: 'df-12019-1',
+        name: 'Schedule Adherence',
+        category: 'normal',
+        impactMinutes: 0,
+        type: 'gain',
+        icon: '🟢',
+        description: 'Successfully reached destination terminal Ranchi on scheduled time'
+      }
+    ]
+  },
+  {
     id: '12951',
     number: '12951',
     name: 'Mumbai Rajdhani Express',

@@ -34,7 +34,9 @@ export default function PassengerTrainTracker({
   onBackToSearch,
   onSelectTrain
 }: PassengerTrainTrackerProps) {
-  const [journeyDate, setJourneyDate] = useState<string>('2026-08-31');
+  const [journeyDate, setJourneyDate] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
   const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
 
   const [liveData, setLiveData] = useState<any>(null);
@@ -52,53 +54,79 @@ export default function PassengerTrainTracker({
   const trainNumber = train.number || train.id;
 
   // Real Multi-Endpoint Backend Data Fetching
-  useEffect(() => {
-    let isMounted = true;
-    async function loadAllTrainData() {
-      setIsLoading(true);
-      setFetchError(null);
+  const loadAllTrainData = React.useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
 
-      try {
-        const [liveRes, schedRes, routeRes, expRes] = await Promise.all([
-          mockTrainService.getLiveTrainStatus(trainNumber),
-          mockTrainService.getTrainSchedule(trainNumber),
-          mockTrainService.getTrainRoute(trainNumber),
-          mockTrainService.getPassengerEtaExplanation(trainNumber)
-        ]);
+    try {
+      const [liveRes, schedRes, routeRes, expRes] = await Promise.all([
+        mockTrainService.getLiveTrainStatus(trainNumber, journeyDate),
+        mockTrainService.getTrainSchedule(trainNumber, journeyDate),
+        mockTrainService.getTrainRoute(trainNumber, journeyDate),
+        mockTrainService.getPassengerEtaExplanation(trainNumber, journeyDate)
+      ]);
 
-        if (isMounted) {
-          setLiveData(liveRes);
-          setScheduleData(schedRes);
-          setRouteGeoData(routeRes);
-          setExplanation(expRes);
-          setLastUpdatedTime(liveRes?.last_updated || new Date().toLocaleTimeString());
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          setFetchError('Unable to sync live telemetry from RailRadar. Displaying baseline schedule.');
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
+      if (!liveRes) {
+        throw new Error(`Unable to fetch live telemetry for Train ${trainNumber} on ${journeyDate}.`);
       }
-    }
 
+      setLiveData(liveRes);
+      setScheduleData(schedRes);
+      setRouteGeoData(routeRes);
+      setExplanation(expRes);
+      setLastUpdatedTime(liveRes?.last_updated || new Date().toLocaleTimeString());
+    } catch (err: any) {
+      console.error('[PassengerTrainTracker] Failed to load train data:', err);
+      setFetchError(err.message || `Unable to fetch live data for this train (${trainNumber}).`);
+      setLiveData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [trainNumber, journeyDate]);
+
+  useEffect(() => {
     loadAllTrainData();
     const interval = setInterval(loadAllTrainData, 15000); // 15s refresh
     return () => {
-      isMounted = false;
       clearInterval(interval);
     };
-  }, [trainNumber, journeyDate]);
+  }, [loadAllTrainData]);
 
   // Demo Simulation Ticker
   useEffect(() => {
     if (!isDemoMode) return;
 
+    // Initialize baseline simulation if no live data exists
+    if (!liveData) {
+      setLiveData({
+        train_number: trainNumber,
+        train_name: train.name || `Express ${trainNumber}`,
+        running_status: 'RUNNING',
+        current_location: 'In Transit',
+        current_segment: `${train.origin || 'Origin'} → ${train.destination || 'Destination'}`,
+        previous_station: train.origin || 'Origin Station',
+        next_station: train.destination || 'Destination Terminal',
+        source_station_name: train.origin || 'Origin',
+        source_station_code: train.originCode || 'ORG',
+        destination_station_name: train.destination || 'Destination',
+        destination_station_code: train.destinationCode || 'DEST',
+        current_delay_minutes: 8,
+        current_speed_kmph: 68,
+        distance_covered_km: 120,
+        total_distance_km: 450,
+        journey_progress_pct: 27,
+        predicted_destination_eta: '19:45',
+        confidence_percentage: 95,
+        stations: train.timeline || [],
+        last_updated: new Date().toLocaleTimeString() + ' IST'
+      });
+    }
+
     const demoInterval = setInterval(() => {
       setLiveData((prev: any) => {
         if (!prev) return prev;
-        const curCovered = prev.distance_covered_km || 342.0;
-        const totDist = prev.total_distance_km || 590.0;
+        const curCovered = prev.distance_covered_km || 120.0;
+        const totDist = prev.total_distance_km || 450.0;
         const nextCovered = curCovered >= totDist ? 10.0 : curCovered + 1.2;
         const nextProg = Math.round((nextCovered / totDist) * 100);
 
@@ -114,30 +142,30 @@ export default function PassengerTrainTracker({
     }, 3000);
 
     return () => clearInterval(demoInterval);
-  }, [isDemoMode]);
+  }, [isDemoMode, trainNumber, train, liveData]);
 
   // Normalized Live Data Fields
-  const trainName = liveData?.train_name || train.name || 'Mandovi Express';
-  const sourceStationName = liveData?.source_station_name || train.origin || 'Mumbai CSMT';
-  const sourceStationCode = liveData?.source_station_code || train.originCode || 'CSMT';
-  const destinationStationName = liveData?.destination_station_name || train.destination || 'Madgaon Jn';
-  const destinationStationCode = liveData?.destination_station_code || train.destinationCode || 'MAO';
+  const trainName = liveData?.train_name || train.name || `Train ${trainNumber}`;
+  const sourceStationName = liveData?.source_station_name || train.origin || 'Origin';
+  const sourceStationCode = liveData?.source_station_code || train.originCode || 'ORG';
+  const destinationStationName = liveData?.destination_station_name || train.destination || 'Destination';
+  const destinationStationCode = liveData?.destination_station_code || train.destinationCode || 'DEST';
 
   const runningStatus = isDemoMode ? 'SIMULATED RUNNING' : (liveData?.running_status || 'RUNNING');
-  const currentDelay = Math.round(liveData?.current_delay_minutes ?? train.delayMinutes ?? 9);
-  const currentSpeed = Math.round(liveData?.current_speed_kmph ?? train.currentSpeed ?? 61);
-  const distanceCoveredKm = Math.round(liveData?.distance_covered_km ?? train.distanceCovered ?? 342);
-  const totalDistanceKm = Math.round(liveData?.total_distance_km ?? train.totalDistance ?? 590);
+  const currentDelay = Math.round(liveData?.current_delay_minutes ?? train.delayMinutes ?? 0);
+  const currentSpeed = Math.round(liveData?.current_speed_kmph ?? train.currentSpeed ?? 0);
+  const distanceCoveredKm = Math.round(liveData?.distance_covered_km ?? train.distanceCovered ?? 0);
+  const totalDistanceKm = Math.round(liveData?.total_distance_km ?? train.totalDistance ?? 0);
   const distanceRemainingKm = Math.max(0, totalDistanceKm - distanceCoveredKm);
-  const journeyProgressPct = Math.round(liveData?.journey_progress_pct ?? ((distanceCoveredKm / Math.max(1, totalDistanceKm)) * 100));
+  const journeyProgressPct = Math.round(liveData?.journey_progress_pct ?? (totalDistanceKm > 0 ? (distanceCoveredKm / totalDistanceKm) * 100 : 0));
 
-  const currentLocation = liveData?.current_location || `Between Thane & Panvel`;
-  const currentSegment = liveData?.current_segment || `Thane → Panvel`;
-  const previousStation = liveData?.previous_station || 'Thane (TNA)';
-  const nextStation = liveData?.next_station || 'Panvel (PNVL)';
+  const currentLocation = liveData?.current_location || (liveData ? 'In Transit' : '--');
+  const currentSegment = liveData?.current_segment || `${sourceStationName} → ${destinationStationName}`;
+  const previousStation = liveData?.previous_station || sourceStationName;
+  const nextStation = liveData?.next_station || destinationStationName;
 
-  const predictedDestinationEta = liveData?.predicted_destination_eta || train.aiPredictedEta || '22:04';
-  const confidencePercentage = liveData?.confidence_percentage || 91;
+  const predictedDestinationEta = liveData?.predicted_destination_eta || train.aiPredictedEta || '--:--';
+  const confidencePercentage = liveData?.confidence_percentage || 94;
   const isDelayed = currentDelay > 5;
 
   // Station sequence list
@@ -162,7 +190,7 @@ export default function PassengerTrainTracker({
       }))
     : (train.timeline && train.timeline.length > 0 ? train.timeline : []);
 
-  const totalHalts = liveData?.total_halts || rawStations.filter(s => s.isHalt !== false).length || 20;
+  const totalHalts = liveData?.total_halts || rawStations.filter(s => s.isHalt !== false).length || rawStations.length;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
@@ -219,12 +247,77 @@ export default function PassengerTrainTracker({
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 1. CORE HERO CARD (RailRadar Summary Specification) */}
-      {/* ========================================================================= */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 relative overflow-hidden space-y-6">
-        {/* Background Ambient Glow */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Loading State */}
+      {isLoading && !liveData && !isDemoMode && (
+        <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center shadow-sm space-y-4">
+          <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+          <div>
+            <h3 className="text-lg font-extrabold text-slate-800">
+              Fetching Live Telemetry for Train {trainNumber}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Contacting RailRadar API for real-time tracking data on {journeyDate}...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Error State when Live Data Cannot be Fetched */}
+      {!isLoading && !liveData && !isDemoMode && (
+        <div className="bg-white border border-rose-200 rounded-3xl p-8 sm:p-10 shadow-sm text-center space-y-6">
+          <div className="w-16 h-16 rounded-3xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center mx-auto shadow-sm">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+
+          <div className="max-w-md mx-auto space-y-2">
+            <h3 className="text-xl font-extrabold text-slate-900 font-heading">
+              Unable to fetch live data for this train
+            </h3>
+            <p className="text-sm text-slate-600">
+              {fetchError || `We could not retrieve live RailRadar tracking information for Train ${trainNumber} on ${journeyDate}.`}
+            </p>
+            <p className="text-xs text-slate-400">
+              Please verify that the train number is valid and currently scheduled on this date, or try picking an adjacent date.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-center gap-3 flex-wrap pt-2">
+            <button
+              onClick={() => loadAllTrainData()}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/20 transition"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Retry Fetch</span>
+            </button>
+
+            <button
+              onClick={onBackToSearch}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Search Another Train</span>
+            </button>
+
+            <button
+              onClick={() => setIsDemoMode(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs shadow-md transition"
+            >
+              <Zap className="w-4 h-4 fill-slate-950" />
+              <span>Enable Demo Simulation</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Live Tracking View (Shown when live data or demo mode is active) */}
+      {(liveData || isDemoMode) && (
+        <>
+          {/* ========================================================================= */}
+          {/* 1. CORE HERO CARD (RailRadar Summary Specification) */}
+          {/* ========================================================================= */}
+          <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 relative overflow-hidden space-y-6">
+            {/* Background Ambient Glow */}
+            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Top Header: Train Number, Name, Route */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6 relative z-10">
@@ -239,12 +332,14 @@ export default function PassengerTrainTracker({
 
               {/* Status Badge */}
               <span className={`text-xs font-black uppercase px-3 py-1 rounded-lg flex items-center gap-1.5 ${
-                isDelayed
+                runningStatus === 'ARRIVED'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                  : isDelayed
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                   : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
               }`}>
-                <span className={`w-2 h-2 rounded-full ${isDelayed ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
-                {runningStatus} ({isDelayed ? `+${currentDelay} min delay` : 'On Time'})
+                <span className={`w-2 h-2 rounded-full ${runningStatus === 'ARRIVED' ? 'bg-emerald-400' : isDelayed ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
+                {runningStatus === 'ARRIVED' ? '✅ ARRIVED / JOURNEY COMPLETED' : `${runningStatus} (${isDelayed ? `+${currentDelay} min delay` : 'On Time'})`}
               </span>
             </div>
 
@@ -264,7 +359,11 @@ export default function PassengerTrainTracker({
               {predictedDestinationEta}
             </div>
             <div className="text-xs font-semibold text-slate-400">
-              Predicted Delay: <strong className="text-amber-400 font-mono">+{currentDelay} min</strong>
+              {runningStatus === 'ARRIVED' ? (
+                <span className="text-emerald-400 font-bold">Successfully Arrived at Destination</span>
+              ) : (
+                <>Predicted Delay: <strong className="text-amber-400 font-mono">+{currentDelay} min</strong></>
+              )}
             </div>
           </div>
         </div>
@@ -404,11 +503,11 @@ export default function PassengerTrainTracker({
         sourceStationName={sourceStationName}
         destinationStationName={destinationStationName}
         totalDistanceKm={totalDistanceKm}
-        scheduledDuration={liveData?.scheduled_duration || '11h 35m'}
+        scheduledDuration={liveData?.scheduled_duration || 'Scheduled'}
         runningDays={['Daily']}
         stations={rawStations}
         currentDelay={currentDelay}
-        currentStationCode={liveData?.previous_station_code || 'TNA'}
+        currentStationCode={liveData?.previous_station_code || liveData?.source_station_code || 'CURR'}
         selectedStation={selectedStation}
         onSelectStation={(st) => setSelectedStation(st)}
       />
@@ -433,9 +532,9 @@ export default function PassengerTrainTracker({
             </h4>
             <div className="flex items-center gap-2 text-xs">
               <span className={`font-black font-mono px-2 py-0.5 rounded text-[11px] ${
-                isDelayed ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'
+                runningStatus === 'ARRIVED' ? 'bg-emerald-600 text-white' : isDelayed ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'
               }`}>
-                {isDelayed ? `${Math.round(currentDelay)}M LATE` : 'ON TIME'}
+                {runningStatus === 'ARRIVED' ? 'JOURNEY COMPLETED' : isDelayed ? `${Math.round(currentDelay)}M LATE` : 'ON TIME'}
               </span>
               <span className="text-slate-400 text-[11px]">
                 Updated {lastUpdatedTime || 'few seconds ago'}
@@ -444,13 +543,7 @@ export default function PassengerTrainTracker({
           </div>
 
           <button
-            onClick={() => {
-              setIsLoading(true);
-              setTimeout(() => {
-                setLastUpdatedTime(new Date().toLocaleTimeString() + ' IST');
-                setIsLoading(false);
-              }, 400);
-            }}
+            onClick={() => loadAllTrainData()}
             className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shadow-lg transition"
             title="Refresh Live Telemetry"
           >
@@ -458,6 +551,8 @@ export default function PassengerTrainTracker({
           </button>
         </div>
       </div>
+    </>
+  )}
     </div>
   );
 }

@@ -92,7 +92,10 @@ export function useLiveTrainData() {
       try {
         const fleetList = await mockTrainService.getTrains();
         if (fleetList && fleetList.length > 0) {
-          setTrains(fleetList);
+          setTrains(prev => {
+            const extra = prev.filter(p => !fleetList.some(f => f.id === p.id || f.number === p.number));
+            return [...fleetList, ...extra];
+          });
         }
       } catch (e) {
         // Fallback

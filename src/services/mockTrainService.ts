@@ -12,7 +12,7 @@ import {
 } from '../types';
 import { INITIAL_TRAINS, NETWORK_HOTSPOTS, OPERATIONAL_ALERTS } from '../data/mockData';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
 export class MockTrainService {
   private trains: Train[] = [...INITIAL_TRAINS];
@@ -50,7 +50,7 @@ export class MockTrainService {
               }
             }
           } catch (err) {
-            // Non-blocking
+            console.error('[RailRadar API] batch-eta fetch failed:', err);
           }
 
           // Map backend dynamic registry objects to frontend Train model
@@ -130,7 +130,7 @@ export class MockTrainService {
         }
       }
     } catch (e) {
-      // Fallback to memory
+      console.error('[RailRadar API] fetch failed:', e);
     }
     return this.trains;
   }
@@ -145,8 +145,9 @@ export class MockTrainService {
         const data = await res.json();
         return data.trains || [];
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback search
+      console.error('[RailRadar API] fetch failed:', e);
     }
     const q = query.toLowerCase().trim();
     return this.trains.filter(t => t.number.includes(q) || t.name.toLowerCase().includes(q)).slice(0, limit);
@@ -162,8 +163,9 @@ export class MockTrainService {
         const data = await res.json();
         return data.stations || [];
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
     }
     const q = query.toLowerCase().trim();
     const defaults: StationItem[] = [
@@ -189,47 +191,17 @@ export class MockTrainService {
         const data = await res.json();
         return data.trains || [];
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
     }
-    return [
-      {
-        train_number: '12019',
-        train_name: 'Howrah - Ranchi Shatabdi Express',
-        type: 'Shatabdi Express',
-        zone: 'ER',
-        source_station_code: fromStation || 'HWH',
-        source_station_name: 'Howrah Junction',
-        destination_station_code: toStation || 'RNC',
-        destination_station_name: 'Ranchi Junction',
-        departure_time: '06:05',
-        arrival_time: '13:15',
-        duration: '7h 10m',
-        total_distance_km: 421.0,
-        runs_on: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-      },
-      {
-        train_number: '12301',
-        train_name: 'Howrah Rajdhani Express',
-        type: 'Rajdhani Express',
-        zone: 'ER',
-        source_station_code: fromStation || 'HWH',
-        source_station_name: 'Howrah Junction',
-        destination_station_code: toStation || 'NDLS',
-        destination_station_name: 'New Delhi',
-        departure_time: '16:50',
-        arrival_time: '10:05',
-        duration: '17h 15m',
-        total_distance_km: 1447.0,
-        runs_on: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-      }
-    ];
+    return [];
   }
 
   // =========================================================================
   // 5. GET FULL TRAIN DETAILS FOR ANY TRAIN IN THE DIRECTORY
   // =========================================================================
-  async getTrainDetails(trainNumber: string): Promise<Train> {
+  async getTrainDetails(trainNumber: string): Promise<Train | null> {
     try {
       const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}`);
       if (res.ok) {
@@ -239,30 +211,33 @@ export class MockTrainService {
           return existing;
         }
 
+        const totalDist = data.total_distance_km || 0;
         const newTrain: Train = {
           id: data.train_number || trainNumber,
           number: data.train_number || trainNumber,
           name: data.train_name || `Train ${trainNumber}`,
-          type: data.train_type || 'Express',
-          origin: data.source_station_name || 'Origin Station',
+          type: data.train_type || (data.train_name?.includes('Shatabdi') ? 'Shatabdi' : data.train_name?.includes('Rajdhani') ? 'Rajdhani' : data.train_name?.includes('Vande') ? 'Vande Bharat' : 'Superfast Express'),
+          zone: data.zone || 'NR',
+          origin: data.source_station_name || 'Origin',
           originCode: data.source_station_code || 'ORG',
-          destination: data.destination_station_name || 'Destination Station',
+          destination: data.destination_station_name || 'Destination',
           destinationCode: data.destination_station_code || 'DEST',
-          currentStation: data.source_station_name || 'Origin',
-          nextStation: data.destination_station_name || 'Destination',
+          currentLocation: `At ${data.destination_station_name || 'Destination'}`,
+          currentLocationCode: data.destination_station_code || 'DEST',
+          nextStation: `${data.destination_station_name || 'Destination'} [Terminus]`,
           nextStationCode: data.destination_station_code || 'DEST',
-          scheduledDeparture: data.departure_time || '06:00',
-          scheduledArrival: data.arrival_time || '14:00',
-          scheduledEta: data.arrival_time || '14:00',
-          aiPredictedEta: data.arrival_time || '14:15',
+          scheduledEta: data.arrival_time || '--:--',
+          traditionalEta: data.arrival_time || '--:--',
+          aiPredictedEta: data.arrival_time ? `${data.arrival_time} (Arrived)` : '--:--',
           delayMinutes: 0,
-          status: 'on-time',
+          status: 'on_time',
           currentSpeed: 0,
-          maxSpeed: 110,
-          totalDistance: data.total_distance_km || 500,
-          distanceCovered: 0,
-          confidence: 'High',
-          congestionScore: 0.2,
+          maxSpeed: 130,
+          totalDistance: totalDist,
+          distanceCovered: totalDist,
+          confidenceScore: 98,
+          dataReliabilityScore: 0.98,
+          congestionScore: 0.1,
           weatherScore: 0.1,
           rainfallMm: 0,
           speedRestrictionScore: 0,
@@ -270,23 +245,24 @@ export class MockTrainService {
           lat: 23.3441,
           lng: 85.3096,
           timeline: data.stations && data.stations.length > 0 ? data.stations.map((s: any, idx: number) => ({
-            id: `st-${idx}`,
-            stationName: s.station_name,
-            stationCode: s.station_code,
-            scheduledArrival: s.scheduled_arrival || '--',
-            scheduledDeparture: s.scheduled_departure || '--',
-            predictedArrival: s.scheduled_arrival || '--',
-            predictedDeparture: s.scheduled_departure || '--',
+            id: `st-${s.station_code || s.stationCode}-${idx}`,
+            sequence: s.sequence || idx + 1,
+            stationName: s.station_name || s.stationName,
+            stationCode: s.station_code || s.stationCode,
+            scheduledArrival: s.scheduled_arrival || s.scheduledArrival || '--',
+            scheduledDeparture: s.scheduled_departure || s.scheduledDeparture || '--',
+            actualArrival: s.scheduled_arrival || s.scheduledArrival || '--',
+            actualDeparture: s.scheduled_departure || s.scheduledDeparture || '--',
+            predictedArrival: s.scheduled_arrival || s.scheduledArrival || '--',
+            predictedDeparture: s.scheduled_departure || s.scheduledDeparture || '--',
             delayMinutes: 0,
-            distanceFromOrigin: s.distance_km || idx * 40,
-            status: idx === 0 ? 'completed' : (idx === 1 ? 'current' : 'upcoming'),
-            platform: '1'
-          })) : [
-            { id: 's1', stationName: data.source_station_name || 'Origin', stationCode: data.source_station_code || 'ORG', scheduledArrival: data.departure_time || '06:00', scheduledDeparture: data.departure_time || '06:00', predictedArrival: data.departure_time || '06:00', predictedDeparture: data.departure_time || '06:00', delayMinutes: 0, distanceFromOrigin: 0, status: 'completed' },
-            { id: 's2', stationName: data.destination_station_name || 'Destination', stationCode: data.destination_station_code || 'DEST', scheduledArrival: data.arrival_time || '14:00', scheduledDeparture: data.arrival_time || '14:00', predictedArrival: data.arrival_time || '14:00', predictedDeparture: data.arrival_time || '14:00', delayMinutes: 0, distanceFromOrigin: data.total_distance_km || 500, status: 'upcoming' }
-          ],
+            distanceFromOrigin: s.distance_km ?? s.distanceKm ?? idx * 40,
+            status: idx === (data.stations.length - 1) ? 'completed' : 'completed',
+            platform: s.platform || `PF ${(idx % 3) + 1}`,
+            isHalt: s.isHalt !== false
+          })) : [],
           delayFactors: [
-            { id: 'df-1', name: 'Section Congestion', category: 'congestion', impactMinutes: 0, type: 'gain', icon: '🟢', source: 'INDIAN RAILWAYS DIRECTORY', description: 'Standard baseline schedule' }
+            { id: 'df-1', name: 'Schedule Adherence', category: 'normal', impactMinutes: 0, type: 'gain', icon: '🟢', source: 'INDIAN RAILWAYS DIRECTORY', description: 'Train details loaded from directory' }
           ],
           lastUpdated: new Date().toLocaleTimeString()
         };
@@ -295,148 +271,111 @@ export class MockTrainService {
         this.trains.push(newTrain);
         return newTrain;
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
     }
 
     const found = this.trains.find(t => t.number === trainNumber || t.id === trainNumber);
     if (found) return found;
 
-    return {
-      id: trainNumber,
-      number: trainNumber,
-      name: `Train ${trainNumber}`,
-      type: 'Express',
-      origin: 'Origin Station',
-      originCode: 'ORG',
-      destination: 'Destination Station',
-      destinationCode: 'DEST',
-      currentStation: 'Origin Station',
-      nextStation: 'Destination Station',
-      nextStationCode: 'DEST',
-      scheduledDeparture: '06:00',
-      scheduledArrival: '14:00',
-      scheduledEta: '14:00',
-      aiPredictedEta: '14:10',
-      delayMinutes: 0,
-      status: 'on-time',
-      currentSpeed: 0,
-      maxSpeed: 110,
-      totalDistance: 500,
-      distanceCovered: 0,
-      confidence: 'Medium',
-      congestionScore: 0.2,
-      weatherScore: 0.1,
-      rainfallMm: 0,
-      speedRestrictionScore: 0,
-      signalDelayScore: 0,
-      lat: 23.3441,
-      lng: 85.3096,
-      timeline: [],
-      delayFactors: [],
-      lastUpdated: new Date().toLocaleTimeString()
-    };
+    return null;
   }
 
   // =========================================================================
+  // =========================================================================
   // 6. LIVE STATUS FOR SPECIFIC TRAIN
   // =========================================================================
-  async getLiveTrainStatus(trainNumber: string): Promise<any> {
+  async getLiveTrainStatus(trainNumber: string, journeyDate?: string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/live`);
+      const url = journeyDate
+        ? `${API_BASE_URL}/trains/${trainNumber}/live?date=${encodeURIComponent(journeyDate)}`
+        : `${API_BASE_URL}/trains/${trainNumber}/live`;
+      const res = await fetch(url);
       if (res.ok) {
         return await res.json();
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
+      return null;
     }
-    const found = this.trains.find(t => t.number === trainNumber || t.id === trainNumber);
-    if (found) {
-      return {
-        train_number: found.number,
-        train_name: found.name,
-        is_live_available: true,
-        running_status: 'RUNNING',
-        current_location: found.currentLocation,
-        previous_station: found.origin,
-        next_station: found.nextStation,
-        destination: found.destination,
-        current_delay_minutes: found.delayMinutes,
-        current_speed_kmph: found.currentSpeed,
-        last_updated: new Date().toLocaleTimeString()
-      };
-    }
-    return null;
   }
 
   // =========================================================================
   // 6. TRAIN SCHEDULE TIMELINE
   // =========================================================================
-  async getTrainSchedule(trainNumber: string): Promise<any> {
+  async getTrainSchedule(trainNumber: string, journeyDate?: string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/schedule`);
+      const url = journeyDate
+        ? `${API_BASE_URL}/trains/${trainNumber}/schedule?date=${encodeURIComponent(journeyDate)}`
+        : `${API_BASE_URL}/trains/${trainNumber}/schedule`;
+      const res = await fetch(url);
       if (res.ok) {
         return await res.json();
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
+      return null;
     }
-    return null;
   }
 
   // =========================================================================
   // 7. TRAIN ROUTE GEOMETRY
   // =========================================================================
-  async getTrainRoute(trainNumber: string): Promise<any> {
+  async getTrainRoute(trainNumber: string, journeyDate?: string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/route`);
+      const url = journeyDate
+        ? `${API_BASE_URL}/trains/${trainNumber}/route?date=${encodeURIComponent(journeyDate)}`
+        : `${API_BASE_URL}/trains/${trainNumber}/route`;
+      const res = await fetch(url);
       if (res.ok) {
         return await res.json();
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
+      return null;
     }
-    return null;
   }
 
   // =========================================================================
   // 8. AI ETA PREDICTION
   // =========================================================================
-  async getTrainEta(trainNumber: string): Promise<any> {
+  async getTrainEta(trainNumber: string, journeyDate?: string): Promise<any> {
     try {
-      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/eta`);
+      const url = journeyDate
+        ? `${API_BASE_URL}/trains/${trainNumber}/eta?date=${encodeURIComponent(journeyDate)}`
+        : `${API_BASE_URL}/trains/${trainNumber}/eta`;
+      const res = await fetch(url);
       if (res.ok) {
         return await res.json();
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
+      return null;
     }
-    return null;
   }
 
   // =========================================================================
   // 7. PASSENGER HUMAN-READABLE DELAY EXPLANATION
   // =========================================================================
-  async getPassengerEtaExplanation(trainNumber: string): Promise<PassengerDelayExplanation> {
+  async getPassengerEtaExplanation(trainNumber: string, journeyDate?: string): Promise<PassengerDelayExplanation | null> {
     try {
-      const res = await fetch(`${API_BASE_URL}/trains/${trainNumber}/eta/explanation`);
+      const url = journeyDate
+        ? `${API_BASE_URL}/trains/${trainNumber}/eta/explanation?date=${encodeURIComponent(journeyDate)}`
+        : `${API_BASE_URL}/trains/${trainNumber}/eta/explanation`;
+      const res = await fetch(url);
       if (res.ok) {
         return await res.json();
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
+      return null;
     }
-    return {
-      train_number: trainNumber,
-      human_summary: 'Heavy rail traffic ahead. Your arrival may be affected by approximately 5–10 minutes.',
-      has_advisory: true,
-      confidence_percentage: 91,
-      breakdown: [
-        { factor: 'Heavy rail traffic ahead', impact_minutes: 6, icon: '🚦' },
-        { factor: 'Weather & visibility conditions', impact_minutes: 2, icon: '🌧' },
-        { factor: 'Current running delay', impact_minutes: 3, icon: '⏱' }
-      ]
-    };
   }
 
   // =========================================================================
@@ -448,8 +387,9 @@ export class MockTrainService {
       if (res.ok) {
         return await res.json();
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
     }
     return {
       timestamp: new Date().toISOString(),
@@ -544,8 +484,9 @@ export class MockTrainService {
         const data = await res.json();
         return data.affected_trains || [];
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
     }
     return [
       { train_number: '12309', train_name: 'Patna Tejas Rajdhani', current_delay_minutes: 32.0, predicted_eta_impact_minutes: 28, risk_level: 'High', congestion_score: 84 },
@@ -565,8 +506,9 @@ export class MockTrainService {
         const data = await res.json();
         return data.trains || [];
       }
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      // Fallback
+      console.error('[RailRadar API] fetch failed:', e);
     }
     return this.trains;
   }
@@ -576,7 +518,7 @@ export class MockTrainService {
   // =========================================================================
   async triggerSimulationEvent(trainId: string, eventType: string, active: boolean) {
     try {
-      await fetch(`${API_BASE_URL}/simulation/event`, {
+      const res = await fetch(`${API_BASE_URL}/simulation/event`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -585,8 +527,11 @@ export class MockTrainService {
           active: active
         })
       });
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
     } catch (e) {
-      // Offline fallback
+      console.error('[RailRadar API] fetch failed:', e);
     }
   }
 

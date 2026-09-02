@@ -21,9 +21,11 @@ interface TrainDetailsViewProps {
 }
 
 export default function TrainDetailsView({ train, trains, onSelectTrain }: TrainDetailsViewProps) {
-  const totalImpact = train.delayFactors.reduce((acc, df) => acc + df.impactMinutes, 0);
+  const delayFactors = train.delayFactors || [];
+  const totalImpact = delayFactors.reduce((acc, df) => acc + (df.impactMinutes || 0), 0);
   const isEstimated = train.dataSourceTransparency?.is_estimated || train.dataQuality?.estimated_telemetry;
   const isSimulated = train.dataSourceTransparency?.is_simulated;
+  const timeline = train.timeline || [];
 
   return (
     <div className="space-y-6">
@@ -187,9 +189,9 @@ export default function TrainDetailsView({ train, trains, onSelectTrain }: Train
             {/* Connecting Track Line */}
             <div className="absolute top-1/2 left-10 right-10 h-1 bg-slate-200 -translate-y-1/2 z-0"></div>
 
-            {train.timeline.map((stop, idx) => {
-              const isCompleted = stop.status === 'completed';
-              const isCurrent = stop.status === 'current';
+            {timeline.map((stop, idx) => {
+              const isCompleted = stop.status === 'completed' || stop.status === 'DEPARTED' || stop.status === 'TERMINUS';
+              const isCurrent = stop.status === 'current' || stop.status === 'AT_STATION';
 
               return (
                 <div key={stop.id} className="relative z-10 flex flex-col items-center text-center group min-w-[100px]">
@@ -276,7 +278,7 @@ export default function TrainDetailsView({ train, trains, onSelectTrain }: Train
 
           {/* Factor List */}
           <div className="space-y-3">
-            {train.delayFactors.map(factor => (
+            {delayFactors.map(factor => (
               <div
                 key={factor.id}
                 className="p-3.5 rounded-xl border border-slate-100 bg-slate-50 flex items-center justify-between hover:bg-slate-100/70 transition"
