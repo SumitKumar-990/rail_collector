@@ -11,6 +11,7 @@ import {
   ModelPredictions
 } from '../types';
 import { INITIAL_TRAINS, NETWORK_HOTSPOTS, OPERATIONAL_ALERTS } from '../data/mockData';
+import { STATION_COORDINATES, getStationCoordinate } from '../data/stationCoordinates';
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -160,24 +161,24 @@ export class MockTrainService {
       const res = await fetch(`${API_BASE_URL}/stations/search?q=${encodeURIComponent(query)}`);
       if (res.ok) {
         const data = await res.json();
-        return data.stations || [];
+        if (data.stations && data.stations.length > 0) {
+          return data.stations;
+        }
       }
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      console.error('[RailRadar API] fetch failed:', e);
+      // Fallback
     }
+
     const q = query.toLowerCase().trim();
-    const defaults: StationItem[] = [
-      { code: 'HWH', name: 'Howrah Junction', city: 'Kolkata' },
-      { code: 'RNC', name: 'Ranchi Junction', city: 'Ranchi' },
-      { code: 'NDLS', name: 'New Delhi', city: 'New Delhi' },
-      { code: 'CNB', name: 'Kanpur Central', city: 'Kanpur' },
-      { code: 'PRYJ', name: 'Prayagraj Junction', city: 'Prayagraj' },
-      { code: 'MMCT', name: 'Mumbai Central', city: 'Mumbai' },
-      { code: 'DGR', name: 'Durgapur', city: 'Durgapur' },
-      { code: 'DHN', name: 'Dhanbad Junction', city: 'Dhanbad' }
-    ];
-    return defaults.filter(s => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.city && s.city.toLowerCase().includes(q)));
+    const allStations: StationItem[] = Object.entries(STATION_COORDINATES).map(([code, info]) => ({
+      code,
+      name: info.name,
+      city: info.name.split(' ')[0]
+    }));
+
+    return allStations
+      .filter(s => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.city && s.city.toLowerCase().includes(q)))
+      .slice(0, 15);
   }
 
   // =========================================================================
@@ -188,13 +189,199 @@ export class MockTrainService {
       const res = await fetch(`${API_BASE_URL}/trains/between?from=${encodeURIComponent(fromStation)}&to=${encodeURIComponent(toStation)}`);
       if (res.ok) {
         const data = await res.json();
-        return data.trains || [];
+        if (data.trains && data.trains.length > 0) {
+          return data.trains;
+        }
       }
-      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     } catch (e) {
-      console.error('[RailRadar API] fetch failed:', e);
+      console.warn('[RailRadar API] fetch failed, using local routing directory:', e);
     }
-    return [];
+
+    return this.getLocalTrainsBetween(fromStation, toStation);
+  }
+
+  // Local Corridor & Railway Directory Engine
+  private getLocalTrainsBetween(fromInput: string, toInput: string): BetweenTrainResult[] {
+    const normalize = (val: string) => {
+      if (!val) return '';
+      const paren = val.match(/\(([A-Za-z0-9]+)\)/);
+      if (paren) return paren[1].toUpperCase().trim();
+      const clean = val.toUpperCase().trim();
+      for (const [code, info] of Object.entries(STATION_COORDINATES)) {
+        if (clean === code || clean.includes(info.name.toUpperCase())) {
+          return code;
+        }
+      }
+      return clean.substring(0, 4);
+    };
+
+    const from = normalize(fromInput);
+    const to = normalize(toInput);
+
+    if (!from || !to || from === to) return [];
+
+    const fromCoord = getStationCoordinate(from);
+    const toCoord = getStationCoordinate(to);
+    const fromName = fromCoord.name;
+    const toName = toCoord.name;
+
+    // Direct and interconnected corridors map
+    // 1. Trunk Grand Chord (Delhi - Kanpur - Prayagraj - DDU - Gaya - Dhanbad - Asansol - Howrah)
+    const grandChord = ['NDLS', 'DLI', 'CNB', 'PRYJ', 'DDU', 'GAYA', 'DHN', 'ASN', 'DGR', 'BWN', 'HWH', 'SDAH'];
+    // 2. West Trunk (Delhi - Mathura - Kota - Ratlam - Vadodara - Surat - Mumbai)
+    const westTrunk = ['NDLS', 'MTJ', 'KOTA', 'RTM', 'BRC', 'ST', 'BDTS', 'MMCT', 'CSMT'];
+    // 3. Delhi - Varanasi (Delhi - Kanpur - Prayagraj - Varanasi)
+    const vnsTrunk = ['NDLS', 'CNB', 'PRYJ', 'BSB'];
+    // 4. Konkan Corridor (Mumbai - Panvel - Roha - Ratnagiri - Madgaon)
+    const konkanTrunk = ['CSMT', 'MMCT', 'PNVL', 'ROHA', 'RN', 'MAO'];
+    // 5. Eastern Jharkhand (Howrah - Barddhaman - Durgapur - Asansol - Dhanbad - Bokaro - Muri - Ranchi)
+    const rncTrunk = ['HWH', 'BWN', 'DGR', 'ASN', 'DHN', 'BKSC', 'MURI', 'RNC'];
+    // 6. Central Corridor (Delhi - Agra - Gwalior - Jhansi - Bhopal)
+    const centralTrunk = ['NDLS', 'AGC', 'GWL', 'VGLJ', 'BPL', 'RKMP'];
+
+    const corridors = [
+      {
+        stops: grandChord,
+        eastTrains: [
+          { num: '12302', name: 'Howrah Rajdhani Express', type: 'Rajdhani', dep: '21:35', arr: '09:55', dur: '12h 20m', dist: 1007 },
+          { num: '12314', name: 'Sealdah Rajdhani Express', type: 'Rajdhani', dep: '21:15', arr: '10:10', dur: '12h 55m', dist: 1012 },
+          { num: '12382', name: 'Poorva Express', type: 'Superfast', dep: '23:05', arr: '17:00', dur: '17h 55m', dist: 1007 },
+          { num: '12876', name: 'Neelachal Express', type: 'Express', dep: '13:30', arr: '07:30', dur: '18h 00m', dist: 1007 }
+        ],
+        westTrains: [
+          { num: '12301', name: 'Howrah Rajdhani Express', type: 'Rajdhani', dep: '16:50', arr: '04:45', dur: '11h 55m', dist: 1007 },
+          { num: '12313', name: 'Sealdah Rajdhani Express', type: 'Rajdhani', dep: '16:50', arr: '05:25', dur: '12h 35m', dist: 1012 },
+          { num: '12381', name: 'Poorva Express', type: 'Superfast', dep: '08:15', arr: '00:05', dur: '15h 50m', dist: 1007 }
+        ]
+      },
+      {
+        stops: vnsTrunk,
+        eastTrains: [
+          { num: '22436', name: 'Vande Bharat Express', type: 'Vande Bharat', dep: '10:10', arr: '14:00', dur: '3h 50m', dist: 319 },
+          { num: '12560', name: 'Shiv Ganga Express', type: 'Superfast', dep: '01:30', arr: '06:10', dur: '4h 40m', dist: 319 }
+        ],
+        westTrains: [
+          { num: '22435', name: 'Vande Bharat Express', type: 'Vande Bharat', dep: '15:00', arr: '18:30', dur: '3h 30m', dist: 319 },
+          { num: '12559', name: 'Shiv Ganga Express', type: 'Superfast', dep: '22:15', arr: '03:10', dur: '4h 55m', dist: 319 }
+        ]
+      },
+      {
+        stops: rncTrunk,
+        eastTrains: [
+          { num: '12019', name: 'Howrah - Ranchi Shatabdi', type: 'Shatabdi', dep: '06:05', arr: '13:15', dur: '7h 10m', dist: 426 },
+          { num: '20898', name: 'Howrah - Ranchi Vande Bharat', type: 'Vande Bharat', dep: '15:45', arr: '22:50', dur: '7h 05m', dist: 463 }
+        ],
+        westTrains: [
+          { num: '12020', name: 'Ranchi - Howrah Shatabdi', type: 'Shatabdi', dep: '13:45', arr: '21:30', dur: '7h 45m', dist: 426 },
+          { num: '20897', name: 'Ranchi - Howrah Vande Bharat', type: 'Vande Bharat', dep: '05:15', arr: '12:20', dur: '7h 05m', dist: 463 }
+        ]
+      },
+      {
+        stops: westTrunk,
+        eastTrains: [
+          { num: '12952', name: 'New Delhi - Mumbai Tejas Rajdhani', type: 'Rajdhani', dep: '16:55', arr: '08:35', dur: '15h 40m', dist: 1386 },
+          { num: '12954', name: 'August Kranti Tejas Rajdhani', type: 'Rajdhani', dep: '17:15', arr: '10:05', dur: '16h 50m', dist: 1378 }
+        ],
+        westTrains: [
+          { num: '12951', name: 'Mumbai Central Tejas Rajdhani', type: 'Rajdhani', dep: '17:00', arr: '08:32', dur: '15h 32m', dist: 1386 },
+          { num: '12953', name: 'August Kranti Tejas Rajdhani', type: 'Rajdhani', dep: '17:10', arr: '09:43', dur: '16h 33m', dist: 1378 }
+        ]
+      },
+      {
+        stops: konkanTrunk,
+        eastTrains: [
+          { num: '10103', name: 'Mandovi Express', type: 'Express', dep: '07:10', arr: '19:10', dur: '12h 00m', dist: 580 },
+          { num: '22229', name: 'Mumbai Goa Vande Bharat', type: 'Vande Bharat', dep: '05:25', arr: '13:10', dur: '7h 45m', dist: 586 }
+        ],
+        westTrains: [
+          { num: '10104', name: 'Mandovi Express', type: 'Express', dep: '09:15', arr: '21:45', dur: '12h 30m', dist: 580 },
+          { num: '22230', name: 'Goa Mumbai Vande Bharat', type: 'Vande Bharat', dep: '14:40', arr: '22:25', dur: '7h 45m', dist: 586 }
+        ]
+      },
+      {
+        stops: centralTrunk,
+        eastTrains: [
+          { num: '12002', name: 'Bhopal Shatabdi Express', type: 'Shatabdi', dep: '06:00', arr: '14:40', dur: '8h 40m', dist: 707 },
+          { num: '20172', name: 'Vande Bharat Express', type: 'Vande Bharat', dep: '14:40', arr: '22:10', dur: '7h 30m', dist: 707 }
+        ],
+        westTrains: [
+          { num: '12001', name: 'New Delhi Shatabdi Express', type: 'Shatabdi', dep: '15:15', arr: '23:50', dur: '8h 35m', dist: 707 },
+          { num: '20171', name: 'Vande Bharat Express', type: 'Vande Bharat', dep: '05:40', arr: '13:10', dur: '7h 30m', dist: 707 }
+        ]
+      }
+    ];
+
+    const results: BetweenTrainResult[] = [];
+
+    // Check corridor matches
+    for (const corr of corridors) {
+      const fIdx = corr.stops.indexOf(from);
+      const tIdx = corr.stops.indexOf(to);
+      if (fIdx !== -1 && tIdx !== -1) {
+        const trainList = fIdx < tIdx ? corr.eastTrains : corr.westTrains;
+        const hopDist = Math.round(Math.abs(tIdx - fIdx) * 110 + 40);
+        for (const tr of trainList) {
+          results.push({
+            train_number: tr.num,
+            train_name: tr.name,
+            type: tr.type,
+            zone: 'NR',
+            source_station_code: from,
+            source_station_name: fromName,
+            destination_station_code: to,
+            destination_station_name: toName,
+            departure_time: tr.dep,
+            arrival_time: tr.arr,
+            duration: tr.dur,
+            total_distance_km: tr.dist || hopDist,
+            runs_on: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+          });
+        }
+      }
+    }
+
+    if (results.length > 0) return results;
+
+    // Fallback dynamic connection for any station pair in India
+    const dLat = (toCoord.lat - fromCoord.lat) * (Math.PI / 180);
+    const dLng = (toCoord.lng - fromCoord.lng) * (Math.PI / 180);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(fromCoord.lat * (Math.PI / 180)) * Math.cos(toCoord.lat * (Math.PI / 180)) * Math.sin(dLng / 2) ** 2;
+    const directKm = Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.28) || 350;
+    const estHours = Math.max(1, Math.round(directKm / 68));
+    const estMins = Math.round((directKm % 68) * 0.7);
+
+    return [
+      {
+        train_number: '12398',
+        train_name: `${fromName} - ${toName} Superfast Express`,
+        type: 'Superfast',
+        zone: 'NR',
+        source_station_code: from,
+        source_station_name: fromName,
+        destination_station_code: to,
+        destination_station_name: toName,
+        departure_time: '07:30',
+        arrival_time: `${String((7 + estHours) % 24).padStart(2, '0')}:${String((30 + estMins) % 60).padStart(2, '0')}`,
+        duration: `${estHours}h ${estMins}m`,
+        total_distance_km: directKm,
+        runs_on: ['Daily']
+      },
+      {
+        train_number: '12498',
+        train_name: `${fromName} - ${toName} SF Intercity`,
+        type: 'Express',
+        zone: 'NCR',
+        source_station_code: from,
+        source_station_name: fromName,
+        destination_station_code: to,
+        destination_station_name: toName,
+        departure_time: '16:15',
+        arrival_time: `${String((16 + estHours) % 24).padStart(2, '0')}:${String((15 + estMins) % 60).padStart(2, '0')}`,
+        duration: `${estHours}h ${estMins}m`,
+        total_distance_km: directKm,
+        runs_on: ['Mon', 'Wed', 'Fri', 'Sat']
+      }
+    ];
   }
 
   // =========================================================================

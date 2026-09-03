@@ -112,10 +112,37 @@ export default function PassengerHome({ onSelectTrain, onSearchBetween }: Passen
     setShowToDropdown(false);
   };
 
+  const resolveStationCode = (query: string, explicitCode: string, fallback: string): string => {
+    if (explicitCode && explicitCode.trim()) return explicitCode.trim().toUpperCase();
+    const paren = query.match(/\(([A-Za-z0-9]+)\)/);
+    if (paren) return paren[1].toUpperCase().trim();
+    const clean = query.trim().toUpperCase();
+    if (clean.length >= 2 && clean.length <= 5 && /^[A-Z0-9]+$/.test(clean)) return clean;
+    const lower = query.toLowerCase();
+    if (lower.includes('kanpur')) return 'CNB';
+    if (lower.includes('howrah') || lower.includes('kolkata')) return 'HWH';
+    if (lower.includes('delhi')) return 'NDLS';
+    if (lower.includes('prayagraj') || lower.includes('allahabad')) return 'PRYJ';
+    if (lower.includes('varanasi') || lower.includes('banaras')) return 'BSB';
+    if (lower.includes('ranchi')) return 'RNC';
+    if (lower.includes('mumbai') || lower.includes('bombay')) return 'MMCT';
+    if (lower.includes('goa') || lower.includes('madgaon')) return 'MAO';
+    if (lower.includes('patna')) return 'PNBE';
+    if (lower.includes('bhopal')) return 'BPL';
+    if (lower.includes('lucknow')) return 'LKO';
+    if (lower.includes('gorakhpur')) return 'GKP';
+    if (lower.includes('agra')) return 'AGC';
+    if (lower.includes('gwalior')) return 'GWL';
+    if (lower.includes('jhansi')) return 'VGLJ';
+    if (lower.includes('gaya')) return 'GAYA';
+    if (lower.includes('dhanbad')) return 'DHN';
+    return clean.substring(0, 4) || fallback;
+  };
+
   const handleFindSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const src = fromCode || fromQuery.trim().toUpperCase().substring(0, 4) || 'HWH';
-    const dst = toCode || toQuery.trim().toUpperCase().substring(0, 4) || 'RNC';
+    const src = resolveStationCode(fromQuery, fromCode, 'CNB');
+    const dst = resolveStationCode(toQuery, toCode, 'HWH');
     onSearchBetween(src, dst);
   };
 
