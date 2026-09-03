@@ -47,10 +47,10 @@ export default function Header({
           </div>
           <div>
             <h1 className="text-lg font-black text-white tracking-tight font-heading flex items-center gap-1.5">
-              RailSight <span className="text-cyan-400">AI</span>
+              RailVue <span className="text-cyan-400">AI</span>
             </h1>
             <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">
-              Dynamic Railway Intelligence
+              Smarter ETA. Better journeys.
             </p>
           </div>
         </div>
