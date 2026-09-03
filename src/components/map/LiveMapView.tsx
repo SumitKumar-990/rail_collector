@@ -58,234 +58,266 @@ export default function LiveMapView({
   onSelectStation,
   geoCoordinates = []
 }: LiveMapViewProps) {
-  const [activeLayer, setActiveLayer] = useState<'standard' | 'congestion'>('standard');
+  const [mapZoom, setMapZoom] = useState(1);
+  const [activeLayer, setActiveLayer] = useState<'standard' | 'satellite' | 'congestion'>('standard');
 
-  const roundedSpeed = Math.round(currentSpeed || 0);
-  const roundedDelay = Math.round(currentDelay || 0);
-  const roundedCovered = Math.round(distanceCoveredKm || 0);
-  const roundedTotal = Math.round(totalDistanceKm || 1);
-  const roundedProgress = Math.min(100, Math.max(0, Math.round(journeyProgressPct || (roundedTotal > 0 ? (roundedCovered / roundedTotal) * 100 : 0))));
-  const isDelayed = roundedDelay > 5;
+// Major Indian Railways station coordinates dictionary for accurate route plotting
+const MAJOR_STATION_COORDS: Record<string, [number, number]> = {
+  // [latitude, longitude]
+  NDLS: [28.6139, 77.2090],
+  DLI: [28.6609, 77.2274],
+  NZM: [28.5888, 77.2534],
+  ANVT: [28.6508, 77.3153],
+  CNB: [26.4499, 80.3319],
+  PRYJ: [25.4358, 81.8463],
+  DDU: [25.2819, 83.1147],
+  MGS: [25.2819, 83.1147],
+  GAYA: [24.7955, 84.9994],
+  DHN: [23.7957, 86.4304],
+  ASN: [23.6889, 86.9661],
+  HWH: [22.5851, 88.3426],
+  SDAH: [22.5675, 88.3712],
+  KOAA: [22.6025, 88.3778],
+  MMCT: [18.9696, 72.8194],
+  CSMT: [18.9400, 72.8353],
+  BDTS: [19.0624, 72.8407],
+  BCT: [18.9696, 72.8194],
+  PNVL: [18.9894, 73.1175],
+  ROHA: [18.4372, 73.1189],
+  RN: [16.9944, 73.3000],
+  MAO: [15.2736, 73.9581],
+  ST: [21.2049, 72.8311],
+  BRC: [22.3107, 73.1812],
+  ADI: [23.0225, 72.5714],
+  RTM: [23.3340, 75.0375],
+  KOTA: [25.2138, 75.8648],
+  SWM: [25.9935, 76.3571],
+  MTJ: [27.4924, 77.6737],
+  AGC: [27.1593, 77.9946],
+  GWL: [26.2183, 78.1828],
+  VGLJ: [25.4484, 78.5685],
+  BPL: [23.2599, 77.4126],
+  RKMP: [23.2294, 77.4262],
+  ET: [22.6139, 77.7639],
+  JBP: [23.1815, 79.9534],
+  NGP: [21.1458, 79.0882],
+  BSP: [22.0797, 82.1409],
+  R: [21.2514, 81.6296],
+  TATA: [22.7719, 86.1956],
+  RNC: [23.3441, 85.3096],
+  BKSC: [23.6693, 86.1511],
+  BBS: [20.2644, 85.8436],
+  CTC: [20.4625, 85.8830],
+  PURI: [19.8135, 85.8312],
+  BSB: [25.3176, 82.9972],
+  LKO: [26.8310, 80.9230],
+  LJN: [26.8310, 80.9230],
+  GKP: [26.7606, 83.3732],
+  PNBE: [25.6022, 85.1376],
+  PPTA: [25.6022, 85.1000],
+  MAS: [13.0827, 80.2707],
+  MS: [13.0800, 80.2750],
+  SBC: [12.9784, 77.5683],
+  YPR: [13.0234, 77.5504],
+  HYB: [17.3916, 78.4682],
+  SC: [17.4334, 78.5015],
+  BZA: [16.5062, 80.6480],
+  VSKP: [17.7231, 83.2986],
+  JP: [26.9196, 75.7878],
+  AII: [26.4499, 74.6399],
+  JU: [26.2389, 73.0243],
+  ASR: [31.6340, 74.8723],
+  JAT: [32.7060, 74.8790],
+  CDG: [30.7046, 76.8013],
+  HW: [29.9457, 78.1642],
+  DDN: [30.3165, 78.0322],
+  ERS: [9.9674, 76.2907],
+  TVC: [8.4875, 76.9525],
+  CBE: [11.0016, 76.9628],
+  MDU: [9.9252, 78.1198]
+};
 
-  // 1. Resolve real Geographic Waypoints for every station in the route
-  const waypoints = useMemo<ResolvedWaypoint[]>(() => {
-    if (!stations || stations.length === 0) {
-      return [];
+  const isDelayed = currentDelay > 5;
+  const isRunning = runningStatus.toUpperCase().includes('RUNNING') || runningStatus.toUpperCase().includes('LIVE');
+
+  // 1. Resolve waypoints with accurate geographic coordinates
+  interface ResolvedWaypoint {
+    lat: number;
+    lng: number;
+    code: string;
+    name: string;
+    isHalt: boolean;
+    isCurrent: boolean;
+    status: string;
+    platform?: string;
+    scheduledArrival?: string;
+  }
+
+  const rawList = (stations && stations.length > 0) ? stations : [];
+  const waypoints: ResolvedWaypoint[] = [];
+
+  // Pass 1: Gather known coordinates
+  const knownCoords: (([number, number]) | null)[] = rawList.map(st => {
+    if (st.latitude && st.longitude && st.latitude > 5 && st.longitude > 65) {
+      return [st.latitude, st.longitude];
     }
+    const code = (st.stationCode || '').toUpperCase().trim();
+    if (MAJOR_STATION_COORDS[code]) {
+      return MAJOR_STATION_COORDS[code];
+    }
+    return null;
+  });
 
-    const totalDist = Math.max(1, totalDistanceKm || stations[stations.length - 1]?.distanceFromOrigin || 1000);
+  // Pass 2: Fill gaps by interpolating between nearest known stations
+  const totalSt = rawList.length;
+  rawList.forEach((st, idx) => {
+    let coord = knownCoords[idx];
 
-    // First pass: attach known coordinates or mark as null
-    const initial = stations.map((st, idx) => {
-      const dist = st.distanceFromOrigin ?? st.distanceKm ?? (idx * 50);
-      let lat = st.latitude;
-      let lng = st.longitude;
-
-      if (!lat || !lng || (lat === 19.06 && lng === 73.01 && st.stationCode !== 'MMCT' && st.stationCode !== 'CSMT')) {
-        const lookup = getStationCoordinate(st.stationCode);
-        if (lookup) {
-          lat = lookup.lat;
-          lng = lookup.lng;
-        }
+    if (!coord) {
+      // Find nearest previous known
+      let prevIdx = -1;
+      for (let p = idx - 1; p >= 0; p--) {
+        if (knownCoords[p]) { prevIdx = p; break; }
+      }
+      // Find nearest next known
+      let nextIdx = -1;
+      for (let n = idx + 1; n < totalSt; n++) {
+        if (knownCoords[n]) { nextIdx = n; break; }
       }
 
-      return {
-        code: st.stationCode || `ST${idx + 1}`,
-        name: st.stationName || st.stationCode,
-        distanceKm: dist,
-        lat: lat ?? null,
-        lng: lng ?? null,
-        isHalt: st.isHalt !== false,
-        isCurrent: st.status === 'AT_STATION' || st.status === 'current',
-        isOrigin: idx === 0,
-        isDestination: idx === stations.length - 1
-      };
-    });
-
-    // Second pass: interpolate any missing station coordinates between nearest known anchors
-    const resolved: ResolvedWaypoint[] = [];
-    for (let i = 0; i < initial.length; i++) {
-      const item = initial[i];
-      if (item.lat !== null && item.lng !== null) {
-        resolved.push({
-          ...item,
-          lat: item.lat,
-          lng: item.lng
-        });
-        continue;
-      }
-
-      // Find prior known anchor
-      let prevAnchor: { lat: number; lng: number; dist: number } | null = null;
-      for (let p = i - 1; p >= 0; p--) {
-        if (initial[p].lat !== null && initial[p].lng !== null) {
-          prevAnchor = { lat: initial[p].lat!, lng: initial[p].lng!, dist: initial[p].distanceKm };
-          break;
-        }
-      }
-
-      // Find next known anchor
-      let nextAnchor: { lat: number; lng: number; dist: number } | null = null;
-      for (let n = i + 1; n < initial.length; n++) {
-        if (initial[n].lat !== null && initial[n].lng !== null) {
-          nextAnchor = { lat: initial[n].lat!, lng: initial[n].lng!, dist: initial[n].distanceKm };
-          break;
-        }
-      }
-
-      let interpLat = 24.0;
-      let interpLng = 80.0;
-
-      if (prevAnchor && nextAnchor) {
-        const span = Math.max(1, nextAnchor.dist - prevAnchor.dist);
-        const ratio = Math.max(0, Math.min(1, (item.distanceKm - prevAnchor.dist) / span));
-        interpLat = prevAnchor.lat + (nextAnchor.lat - prevAnchor.lat) * ratio;
-        interpLng = prevAnchor.lng + (nextAnchor.lng - prevAnchor.lng) * ratio;
-      } else if (prevAnchor) {
-        interpLat = prevAnchor.lat;
-        interpLng = prevAnchor.lng + 0.15;
-      } else if (nextAnchor) {
-        interpLat = nextAnchor.lat;
-        interpLng = nextAnchor.lng - 0.15;
+      if (prevIdx !== -1 && nextIdx !== -1) {
+        const factor = (idx - prevIdx) / (nextIdx - prevIdx);
+        const pCoord = knownCoords[prevIdx]!;
+        const nCoord = knownCoords[nextIdx]!;
+        coord = [
+          pCoord[0] + (nCoord[0] - pCoord[0]) * factor,
+          pCoord[1] + (nCoord[1] - pCoord[1]) * factor
+        ];
+      } else if (prevIdx !== -1) {
+        coord = knownCoords[prevIdx]!;
+      } else if (nextIdx !== -1) {
+        coord = knownCoords[nextIdx]!;
       } else {
-        const ratio = item.distanceKm / totalDist;
-        interpLat = 28.61 - (28.61 - 22.58) * ratio;
-        interpLng = 77.20 + (88.34 - 77.20) * ratio;
+        // Fallback generic route spread across Northern/Western India
+        const ratio = totalSt > 1 ? idx / (totalSt - 1) : 0.5;
+        coord = [19.0 + (28.6 - 19.0) * ratio, 72.8 + (77.2 - 72.8) * ratio];
       }
-
-      resolved.push({
-        ...item,
-        lat: interpLat,
-        lng: interpLng
-      });
     }
 
-    return resolved;
-  }, [stations, totalDistanceKm]);
+    waypoints.push({
+      lat: coord[0],
+      lng: coord[1],
+      code: st.stationCode || `ST${idx + 1}`,
+      name: st.stationName || st.stationCode || `Station ${idx + 1}`,
+      isHalt: st.isHalt !== false,
+      isCurrent: st.status === 'AT_STATION' || st.status === 'current',
+      status: st.status || 'UPCOMING',
+      platform: st.platform,
+      scheduledArrival: st.scheduledArrival
+    });
+  });
 
-  // 2. Synchronize Live Train Marker Position
-  const trainPosition = useMemo<{ lat: number; lng: number }>(() => {
-    if (waypoints.length === 0) {
-      return { lat: latitude || 26.4499, lng: longitude || 80.3319 };
+  // Fallback if no stations present at all
+  if (waypoints.length === 0) {
+    waypoints.push(
+      { lat: 18.9696, lng: 72.8194, code: 'ORG', name: 'Origin', isHalt: true, isCurrent: false, status: 'DEPARTED' },
+      { lat: 28.6139, lng: 77.2090, code: 'DEST', name: 'Destination', isHalt: true, isCurrent: false, status: 'UPCOMING' }
+    );
+  }
+
+  // 2. Compute dynamic auto-fit bounding box with uniform padding
+  const lats = waypoints.map(w => w.lat);
+  const lngs = waypoints.map(w => w.lng);
+  let minLat = Math.min(...lats);
+  let maxLat = Math.max(...lats);
+  let minLng = Math.min(...lngs);
+  let maxLng = Math.max(...lngs);
+
+  // Guarantee minimum dimension to prevent division by zero or single point collapse
+  const minDimension = 0.5;
+  if (maxLat - minLat < minDimension) {
+    const mid = (maxLat + minLat) / 2;
+    minLat = mid - minDimension / 2;
+    maxLat = mid + minDimension / 2;
+  }
+  if (maxLng - minLng < minDimension) {
+    const mid = (maxLng + minLng) / 2;
+    minLng = mid - minDimension / 2;
+    maxLng = mid + minDimension / 2;
+  }
+
+  // Add 16% padding around coordinates for clean margins and label visibility
+  const latMargin = (maxLat - minLat) * 0.16;
+  const lngMargin = (maxLng - minLng) * 0.16;
+  minLat -= latMargin;
+  maxLat += latMargin;
+  minLng -= lngMargin;
+  maxLng += lngMargin;
+
+  const latSpan = maxLat - minLat;
+  const lngSpan = maxLng - minLng;
+
+  const SVG_WIDTH = 800;
+  const SVG_HEIGHT = 420;
+  const PADDING_X = 65;
+  const PADDING_Y = 50;
+
+  const toSvgX = (lng: number) => {
+    return PADDING_X + ((lng - minLng) / lngSpan) * (SVG_WIDTH - 2 * PADDING_X);
+  };
+  const toSvgY = (lat: number) => {
+    // Invert Y axis so higher latitude is at the top of the canvas
+    return PADDING_Y + ((maxLat - lat) / latSpan) * (SVG_HEIGHT - 2 * PADDING_Y);
+  };
+
+  // 3. Compute SVG path points
+  const points = waypoints.map(w => ({ x: toSvgX(w.lng), y: toSvgY(w.lat) }));
+  const fullPolylinePoints = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ');
+  const pathD = points.length > 1 ? `M ${fullPolylinePoints}` : `M 80,210 L 720,210`;
+
+  // 4. Snap train position precisely onto the route polyline according to journey progress
+  const getTrainRoutePosition = () => {
+    if (points.length === 0) return { x: 400, y: 210 };
+    if (points.length === 1) return { x: points[0].x, y: points[0].y };
+
+    // Cumulative leg lengths
+    const legLengths: number[] = [0];
+    for (let i = 1; i < points.length; i++) {
+      const d = Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+      legLengths.push(legLengths[i - 1] + (d || 1));
     }
+    const totalLen = legLengths[legLengths.length - 1];
+    const clampedProgress = Math.max(0, Math.min(100, journeyProgressPct || 0)) / 100;
+    const targetDistance = clampedProgress * totalLen;
 
-    // Check if input latitude/longitude match within the corridor bounding box
-    const minWLat = Math.min(...waypoints.map(w => w.lat)) - 1.5;
-    const maxWLat = Math.max(...waypoints.map(w => w.lat)) + 1.5;
-    const minWLng = Math.min(...waypoints.map(w => w.lng)) - 1.5;
-    const maxWLng = Math.max(...waypoints.map(w => w.lng)) + 1.5;
-
-    const isCoordInsideCorridor =
-      latitude &&
-      longitude &&
-      latitude >= minWLat &&
-      latitude <= maxWLat &&
-      longitude >= minWLng &&
-      longitude <= maxWLng;
-
-    if (isCoordInsideCorridor) {
-      return { lat: latitude, lng: longitude };
-    }
-
-    // Interpolate along route waypoints according to journey progress
-    const progressFraction = Math.max(0, Math.min(1, roundedProgress / 100));
-    const totalDist = waypoints[waypoints.length - 1].distanceKm || Math.max(1, totalDistanceKm);
-    const targetDist = progressFraction * totalDist;
-
-    // Find segment [i, i+1]
-    for (let i = 0; i < waypoints.length - 1; i++) {
-      const w1 = waypoints[i];
-      const w2 = waypoints[i + 1];
-      if (targetDist >= w1.distanceKm && targetDist <= w2.distanceKm) {
-        const segLen = Math.max(1, w2.distanceKm - w1.distanceKm);
-        const segRatio = (targetDist - w1.distanceKm) / segLen;
+    for (let i = 1; i < legLengths.length; i++) {
+      if (targetDistance <= legLengths[i]) {
+        const segStart = legLengths[i - 1];
+        const segEnd = legLengths[i];
+        const segRatio = (targetDistance - segStart) / (segEnd - segStart || 1);
         return {
-          lat: w1.lat + (w2.lat - w1.lat) * segRatio,
-          lng: w1.lng + (w2.lng - w1.lng) * segRatio
+          x: points[i - 1].x + (points[i].x - points[i - 1].x) * segRatio,
+          y: points[i - 1].y + (points[i].y - points[i - 1].y) * segRatio,
+          segIndex: i - 1
         };
       }
     }
 
-    // Fallback to origin or destination waypoint
-    if (progressFraction >= 0.99) {
-      const last = waypoints[waypoints.length - 1];
-      return { lat: last.lat, lng: last.lng };
-    }
-    const first = waypoints[0];
-    return { lat: first.lat, lng: first.lng };
-  }, [waypoints, latitude, longitude, roundedProgress, totalDistanceKm]);
+    const last = points[points.length - 1];
+    return { x: last.x, y: last.y, segIndex: points.length - 2 };
+  };
 
-  // 3. Dynamic Bounding Box & SVG Vector Projection
-  const { toSvgX, toSvgY } = useMemo(() => {
-    if (waypoints.length === 0) {
-      return {
-        toSvgX: (_lng: number) => 400,
-        toSvgY: (_lat: number) => 220
-      };
-    }
+  const trainPos = getTrainRoutePosition();
+  const trainX = trainPos.x;
+  const trainY = trainPos.y;
 
-    const allLats = waypoints.map(w => w.lat).concat(trainPosition.lat);
-    const allLngs = waypoints.map(w => w.lng).concat(trainPosition.lng);
-
-    const minLat = Math.min(...allLats);
-    const maxLat = Math.max(...allLats);
-    const minLng = Math.min(...allLngs);
-    const maxLng = Math.max(...allLngs);
-
-    const latSpanRaw = Math.max(0.4, maxLat - minLat);
-    const lngSpanRaw = Math.max(0.4, maxLng - minLng);
-
-    // Generous padding so station codes, badges, and radar pulses are never clipped
-    const latPad = latSpanRaw * 0.22;
-    const lngPad = lngSpanRaw * 0.22;
-
-    const bMinLat = minLat - latPad;
-    const bMaxLat = maxLat + latPad;
-    const bMinLng = minLng - lngPad;
-    const bMaxLng = maxLng + lngPad;
-
-    const totalLatSpan = bMaxLat - bMinLat;
-    const totalLngSpan = bMaxLng - bMinLng;
-
-    // ViewBox: 0 0 850 440
-    // Usable canvas inner area: X: 80 to 770 (width 690), Y: 60 to 380 (height 320)
-    return {
-      toSvgX: (lng: number) => 80 + ((lng - bMinLng) / totalLngSpan) * 690,
-      toSvgY: (lat: number) => 60 + ((bMaxLat - lat) / totalLatSpan) * 320 // Inverted Y for map
-    };
-  }, [waypoints, trainPosition]);
-
-  // Generate Traveled vs Remaining Polyline SVG Paths
-  const trainSvgX = toSvgX(trainPosition.lng);
-  const trainSvgY = toSvgY(trainPosition.lat);
-
-  const fullPathD = useMemo(() => {
-    if (waypoints.length < 2) return '';
-    return 'M ' + waypoints.map(w => `${toSvgX(w.lng).toFixed(1)},${toSvgY(w.lat).toFixed(1)}`).join(' L ');
-  }, [waypoints, toSvgX, toSvgY]);
-
-  // Build traveled path up to train position
-  const traveledPathD = useMemo(() => {
-    if (waypoints.length < 2) return '';
-    const points: string[] = [];
-    const totalDist = waypoints[waypoints.length - 1].distanceKm || totalDistanceKm || 1000;
-    const trainDist = (roundedProgress / 100) * totalDist;
-
-    for (let i = 0; i < waypoints.length; i++) {
-      const w = waypoints[i];
-      if (w.distanceKm <= trainDist) {
-        points.push(`${toSvgX(w.lng).toFixed(1)},${toSvgY(w.lat).toFixed(1)}`);
-      } else {
-        break;
-      }
-    }
-    points.push(`${trainSvgX.toFixed(1)},${trainSvgY.toFixed(1)}`);
-
-    return points.length > 1 ? 'M ' + points.join(' L ') : '';
-  }, [waypoints, roundedProgress, totalDistanceKm, toSvgX, toSvgY, trainSvgX, trainSvgY]);
-
-  const originStation = waypoints[0];
-  const destStation = waypoints[waypoints.length - 1];
+  // Build partial traveled path up to train position
+  const traveledPoints = [];
+  for (let i = 0; i <= (trainPos.segIndex ?? 0); i++) {
+    traveledPoints.push(`${points[i].x.toFixed(1)},${points[i].y.toFixed(1)}`);
+  }
+  traveledPoints.push(`${trainX.toFixed(1)},${trainY.toFixed(1)}`);
+  const traveledPathD = traveledPoints.length > 1 ? `M ${traveledPoints.join(' L ')}` : '';
 
   return (
     <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl overflow-hidden relative">
@@ -345,12 +377,17 @@ export default function LiveMapView({
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:3.5rem_3.5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-25 pointer-events-none" />
 
         {/* SVG Route Geometry Map */}
-        <svg viewBox="0 0 850 440" className="w-full h-full relative z-10">
+        <svg viewBox="0 0 800 420" className="w-full h-full relative z-10">
           <defs>
             <linearGradient id="routeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#10b981" />
               <stop offset="50%" stopColor="#06b6d4" />
               <stop offset="100%" stopColor="#3b82f6" />
+            </linearGradient>
+            <linearGradient id="congestionGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#10b981" />
+              <stop offset="60%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#ef4444" />
             </linearGradient>
             <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="3.5" result="blur" />
@@ -360,39 +397,39 @@ export default function LiveMapView({
               <feGaussianBlur stdDeviation="5" result="blur" />
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
+            <filter id="trainGlow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
           </defs>
 
-          {/* 1. Full Railway Track Base Shadow */}
-          {fullPathD && (
-            <path
-              d={fullPathD}
-              fill="none"
-              stroke="#0f172a"
-              strokeWidth="12"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
+          {/* Background Route Path Shadow */}
+          <path
+            d={pathD}
+            fill="none"
+            stroke="#0f172a"
+            strokeWidth="12"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
 
-          {/* 2. Remaining Route Path (Dashed Slate) */}
-          {fullPathD && (
-            <path
-              d={fullPathD}
-              fill="none"
-              stroke="#334155"
-              strokeWidth="4"
-              strokeDasharray="6 6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
+          {/* Full / Remaining Route (Dashed slate) */}
+          <path
+            d={pathD}
+            fill="none"
+            stroke="#334155"
+            strokeWidth="5"
+            strokeDasharray="8 6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
 
-          {/* 3. Traveled / Active Route Path (Vibrant Gradient with Glow) */}
+          {/* Active Traveled Route (Solid glowing gradient up to train) */}
           {traveledPathD && (
             <path
               d={traveledPathD}
               fill="none"
-              stroke={activeLayer === 'congestion' ? '#f59e0b' : 'url(#routeGradient)'}
+              stroke={activeLayer === 'congestion' ? 'url(#congestionGradient)' : 'url(#routeGradient)'}
               strokeWidth="6"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -400,12 +437,14 @@ export default function LiveMapView({
             />
           )}
 
-          {/* 4. Station Stop Pins & Badges */}
+          {/* Station Stop Pins along route */}
           {waypoints.map((st, idx) => {
-            const x = toSvgX(st.lng);
-            const y = toSvgY(st.lat);
+            const pt = points[idx];
+            if (!pt) return null;
+            const x = pt.x;
+            const y = pt.y;
             const isSelected = selectedStation?.stationCode === st.code;
-            const isEndpoint = st.isOrigin || st.isDestination;
+            const isDeparted = idx <= (trainPos.segIndex ?? 0);
 
             return (
               <g
@@ -416,52 +455,35 @@ export default function LiveMapView({
                   if (matched && onSelectStation) onSelectStation(matched);
                 }}
               >
-                {/* Station Pin Halo on Hover / Selected */}
-                {isSelected && (
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r={14}
-                    fill="none"
-                    stroke="#38bdf8"
-                    strokeWidth="2"
-                    opacity="0.6"
-                    className="animate-pulse"
-                  />
-                )}
-
-                {/* Main Station Marker */}
+                {/* Station Node Halo on Hover/Selected */}
                 <circle
                   cx={x}
                   cy={y}
-                  r={isEndpoint ? 7 : (st.isHalt ? 5 : 3.5)}
-                  fill={isEndpoint ? '#38bdf8' : (st.isHalt ? '#ffffff' : '#94a3b8')}
-                  stroke={isEndpoint ? '#0284c7' : '#0f172a'}
-                  strokeWidth={isEndpoint ? 2.5 : 2}
-                  className="transition-transform duration-200 group-hover:scale-125"
+                  r={isSelected ? 10 : (st.isHalt ? 7 : 4.5)}
+                  fill={isSelected ? '#38bdf8' : (isDeparted ? '#10b981' : (st.isHalt ? '#ffffff' : '#64748b'))}
+                  opacity={isSelected ? 0.35 : 0.15}
+                  className="group-hover:scale-150 transition-all duration-300"
                 />
-
-                {/* Station Code Badge */}
-                <g transform={`translate(${x}, ${y + (idx % 2 === 0 ? 18 : -14)})`}>
-                  <rect
-                    x={-20}
-                    y={-8}
-                    width={40}
-                    height={16}
-                    rx={5}
-                    fill="#0f172a"
-                    stroke={isSelected ? '#38bdf8' : '#334155'}
-                    strokeWidth="1"
-                    className="group-hover:stroke-white transition"
-                  />
+                {/* Main Station Dot */}
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={isSelected ? 6 : (st.isHalt ? 4.5 : 3)}
+                  fill={isSelected ? '#38bdf8' : (isDeparted ? '#34d399' : (st.isHalt ? '#ffffff' : '#64748b'))}
+                  stroke={isSelected ? '#0284c7' : '#0f172a'}
+                  strokeWidth="2"
+                  className="transition-all duration-300 group-hover:scale-125"
+                />
+                {/* Station Code Label */}
+                {st.isHalt && (
                   <text
-                    x={0}
-                    y={3.5}
-                    fill={isSelected ? '#38bdf8' : '#e2e8f0'}
-                    fontSize="9.5"
+                    x={x}
+                    y={y + 16}
+                    fill={isSelected ? '#38bdf8' : (isDeparted ? '#cbd5e1' : '#94a3b8')}
+                    fontSize="10"
                     fontWeight="bold"
                     textAnchor="middle"
-                    className="font-mono tracking-wider group-hover:fill-white select-none pointer-events-none"
+                    className="font-mono tracking-tight group-hover:fill-white transition filter drop-shadow"
                   >
                     {st.code}
                   </text>
@@ -470,14 +492,12 @@ export default function LiveMapView({
             );
           })}
 
-          {/* 5. Real-Time Train Marker with Radar Pulse Beacon */}
-          <g transform={`translate(${trainSvgX}, ${trainSvgY})`} className="transition-all duration-700 ease-out z-30">
-            {/* Live Radar Beacon Rings */}
-            <circle cx="0" cy="0" r="22" fill="#38bdf8" opacity="0.2" className="animate-ping" />
-            <circle cx="0" cy="0" r="14" fill="#0284c7" opacity="0.35" />
-            <circle cx="0" cy="0" r="9" fill="#0284c7" stroke="#ffffff" strokeWidth="2.5" filter="url(#trainGlow)" />
-
-            {/* Train Emoji / Direction Icon */}
+          {/* Current Live Train Marker (Anchored directly on track) */}
+          <g transform={`translate(${trainX}, ${trainY})`} className="transition-all duration-500 ease-out z-30 pointer-events-none">
+            {/* Radar Pulse Rings */}
+            <circle cx="0" cy="0" r="22" fill="#3b82f6" opacity="0.25" className="animate-ping" />
+            <circle cx="0" cy="0" r="14" fill="#3b82f6" opacity="0.45" />
+            <circle cx="0" cy="0" r="10" fill="#2563eb" stroke="#ffffff" strokeWidth="2.5" filter="url(#trainGlow)" />
             <text x="0" y="3.5" fill="#ffffff" fontSize="10" textAnchor="middle" fontWeight="bold">
               🚆
             </text>

@@ -4,7 +4,7 @@ from datetime import datetime
 
 class TrainRegistry:
     """
-    Dynamic Multi-Train Registry for RailSight AI.
+    Dynamic Multi-Train Registry for RailVue AI.
     Manages active train fleet state across Indian Railways trunk corridors.
     Scalable to 10 -> 50 -> 100 -> N trains without hardcoded restrictions.
     """
