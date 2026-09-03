@@ -487,7 +487,7 @@ const MAJOR_STATION_COORDS: Record<string, [number, number]> = {
                   >
                     {st.code}
                   </text>
-                </g>
+                )}
               </g>
             );
           })}
