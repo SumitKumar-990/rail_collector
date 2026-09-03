@@ -59,7 +59,7 @@ export default function RailRadarTimeline({
     },
     {
       q: `How accurate is the running status for train ${trainNumber}?`,
-      a: `The running status is highly accurate because it uses real-time GPS locations and RailSight AI XGBoost predictions. This is much faster and more accurate than traditional ntes station arrival reports.`
+      a: `The running status is highly accurate because it uses real-time GPS locations and RailVue AI XGBoost predictions. This is much faster and more accurate than traditional ntes station arrival reports.`
     },
     {
       q: `Why is train ${trainNumber} showing offline or not updating?`,

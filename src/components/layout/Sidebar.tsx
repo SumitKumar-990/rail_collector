@@ -43,10 +43,10 @@ export default function Sidebar({ activePage, onPageChange, criticalAlertCount }
           </div>
           <div>
             <h1 className="text-xl font-black tracking-tight flex items-center gap-1 text-white font-heading">
-              RailPulse <span className="text-cyan-400">AI</span>
+              RailVue <span className="text-cyan-400">AI</span>
             </h1>
             <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">
-              Real-Time Train Intelligence
+              Smarter ETA. Better journeys.
             </p>
           </div>
         </div>
