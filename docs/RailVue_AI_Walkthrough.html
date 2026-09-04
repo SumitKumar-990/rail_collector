@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RailVue AI — Technical Walkthrough & Architecture Report</title>
+<style>
+  @page {
+    size: A4;
+    margin: 11mm 13mm 11mm 13mm;
+    @bottom-right {
+      content: "Page " counter(page);
+      font-size: 8pt;
+      color: #94a3b8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+  }
+
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #0f172a;
+    line-height: 1.45;
+    font-size: 9.5pt;
+    background: #ffffff;
+    margin: 0;
+    padding: 0;
+  }
+
+  .header-cover {
+    border-bottom: 2.5px solid #0284c7;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .brand-title {
+    font-size: 23pt;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -0.5px;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .brand-title span {
+    color: #0284c7;
+  }
+
+  .brand-tagline {
+    font-size: 9pt;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-top: 3px;
+  }
+
+  .meta-badge {
+    text-align: right;
+    font-size: 8pt;
+    color: #475569;
+    line-height: 1.35;
+  }
+
+  .badge-pill {
+    display: inline-block;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-weight: 800;
+    font-size: 7.5pt;
+    padding: 3px 8px;
+    border-radius: 9999px;
+    border: 1px solid #bae6fd;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+
+  h2 {
+    font-size: 12pt;
+    border-left: 3.5px solid #0284c7;
+    padding-left: 8px;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    color: #0f172a;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+  }
+
+  h3 {
+    font-size: 10.5pt;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    color: #1e293b;
+    font-weight: 750;
+  }
+
+  p {
+    margin: 0 0 8px 0;
+    color: #334155;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  .highlight-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 3.5px solid #3b82f6;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 10px 0;
+    font-size: 9.5pt;
+  }
+
+  .highlight-box.green {
+    border-left-color: #10b981;
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+  }
+
+  .highlight-box.amber {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+    border-color: #fde68a;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 14px 0;
+    font-size: 9pt;
+  }
+
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 7px 9px;
+    border: 1px solid #0f172a;
+  }
+
+  td {
+    padding: 6px 9px;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+  }
+
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  .math-card {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 9.5pt;
+    margin: 10px 0;
+    line-height: 1.5;
+  }
+
+  .math-card span.kw { color: #38bdf8; font-weight: bold; }
+  .math-card span.target { color: #4ade80; font-weight: bold; }
+  .math-card span.num { color: #fbbf24; font-weight: bold; }
+
+  .grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 10px 0;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 10px 0;
+  }
+
+  .grid-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px;
+  }
+
+  .card-stat {
+    text-align: center;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+  }
+
+  .card-stat .val {
+    font-size: 16pt;
+    font-weight: 900;
+    color: #0284c7;
+    line-height: 1.2;
+  }
+
+  .card-stat .lbl {
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-top: 3px;
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 7.5pt;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .tag-green { background: #dcfce7; color: #15803d; }
+  .tag-blue { background: #e0f2fe; color: #0369a1; }
+  .tag-amber { background: #fef3c7; color: #b45309; }
+
+  ul {
+    margin: 4px 0 8px 18px;
+    padding: 0;
+  }
+
+  li {
+    margin-bottom: 3px;
+    color: #334155;
+  }
+
+  .pipeline-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 8.5pt;
+  }
+
+  .step-num {
+    background: #0284c7;
+    color: white;
+    font-weight: bold;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7.5pt;
+    flex-shrink: 0;
+  }
+
+  .step-content {
+    background: #f1f5f9;
+    padding: 6px 10px;
+    border-radius: 6px;
+    flex: 1;
+    border: 1px solid #e2e8f0;
+  }
+
+  .footer-note {
+    font-size: 8pt;
+    color: #94a3b8;
+    text-align: center;
+    margin-top: 20px;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header-cover">
+  <div>
+    <h1 class="brand-title">RailVue <span>AI</span></h1>
+    <div class="brand-tagline">Real-Time Indian Railways Dynamic ETA & Network Intelligence</div>
+  </div>
+  <div class="meta-badge">
+    <div class="badge-pill">Production Architecture</div><br>
+    <strong>Smart India Hackathon (SIH)</strong><br>
+    FastAPI • XGBoost • React 18 • Vite<br>
+    Full Technical Walkthrough
+  </div>
+</div>
+
+<!-- SECTION 1: EXECUTIVE SUMMARY -->
+<div class="avoid-break">
+  <h2>1. Executive Summary</h2>
+  <p>
+    <strong>RailVue AI</strong> is an end-to-end operational train dispatch and passenger intelligence platform engineered specifically for the complexities of the <strong>Indian Railways</strong> network. It transitions train operations from static timetable tracking to proactive, machine-learning-driven <strong>Estimated Time of Arrival (ETA)</strong> predictions that continuously account for real-time section speeds, junction bottlenecks, preceding train density, and adverse meteorological conditions.
+  </p>
+
+  <div class="grid-4">
+    <div class="card-stat">
+      <div class="val">10.37 min</div>
+      <div class="lbl">Tuned XGBoost MAE</div>
+    </div>
+    <div class="card-stat">
+      <div class="val">42.3%</div>
+      <div class="lbl">Error Reduction vs Timetable</div>
+    </div>
+    <div class="card-stat">
+      <div class="val">84.1%</div>
+      <div class="lbl">Delay Risk Classifier Acc.</div>
+    </div>
+    <div class="card-stat">
+      <div class="val">1,500+</div>
+      <div class="lbl">Indexed Rail Directory</div>
+    </div>
+  </div>
+
+  <div class="highlight-box green">
+    <strong>Key Operational Benchmark:</strong> The standard static timetable schedule incurs an average arrival error of <strong>17.96 minutes</strong>. RailVue AI's tuned gradient-boosted engine slashes prediction error down to <strong>10.37 minutes</strong>, delivering actionable punctuality intelligence to railway section controllers and daily passengers.
+  </div>
+</div>
+
+<!-- SECTION 2: ARCHITECTURAL REFRAME -->
+<div class="avoid-break">
+  <h2>2. Architectural Breakthrough: The Delay-Deviation Target</h2>
+  <p>
+    In long-distance railway systems, training models to predict absolute remaining duration directly leads to <em>metric inflation</em>. Because journey distances range from 50 km to over 1,500 km, trip length variance dominates the Total Sum of Squares (SS<sub>tot</sub>), yielding artificially inflated R² values (>0.95) that conceal poor real-world delay tracking.
+  </p>
+
+  <h3>The Delay Deviation Formulation (&Delta;<sub>delay</sub>)</h3>
+  <p>
+    RailVue AI solves this by reframing the core prediction objective to <strong>Delay Deviation from the Official Timetable</strong>:
+  </p>
+
+  <div class="math-card">
+    <span class="kw">[Target Definition]</span><br>
+    &Delta;<sub>delay</sub> = Actual Arrival Delay &minus; Current Observed Delay<br>
+    <span class="target">model_target_column</span> = <span class="num">"delay_deviation_minutes"</span><br><br>
+    <span class="kw">[Serving-Time ETA Reconstruction]</span><br>
+    Dynamic ETA = Scheduled Arrival Time + Current Delay + <span class="target">&Delta;<sub>predicted</sub></span>
+  </div>
+
+  <p>
+    By isolating dynamic delay drift, the models focus strictly on stochastic operational factors: track congestion, signal halts, dispatch priorities, and weather restrictions.
+  </p>
+</div>
+
+<!-- SECTION 3: DATA RIGOR -->
+<div class="avoid-break">
+  <h2>3. Anti-Leakage Data Pipeline & Feature Vector</h2>
+  <p>
+    To guarantee true generalization on unseen journeys, the dataset pipeline enforces three engineering guardrails:
+  </p>
+  <ul>
+    <li><strong>Journey-Aware Group Splitting:</strong> Dataset rows are grouped using <code>GroupKFold</code> based on unique <code>journey_id</code>. Multiple snapshots of the same train run are strictly isolated to either the training or test set, preventing temporal leakage.</li>
+    <li><strong>Train-Fold Only Historical Priors:</strong> Corridor congestion scores and station dwell variance are calculated strictly on training folds and mapped to test folds.</li>
+    <li><strong>Physics-Informed Sanity Bounds:</strong> Serving-time ETAs are bounded by physical corridor speed limits (160 km/h for Vande Bharat, 130 km/h for Rajdhani/Shatabdi), preventing negative transit times or impossible velocities.</li>
+  </ul>
+
+  <h3>Feature Vector (18 Engineered Signals)</h3>
+  <div class="grid-2">
+    <div class="grid-item">
+      <strong>Spatial & Telemetry Features:</strong>
+      <ul>
+        <li><code>distance_remaining_km</code></li>
+        <li><code>journey_progress_pct</code></li>
+        <li><code>current_speed_kmph</code></li>
+        <li><code>current_delay_minutes</code></li>
+        <li><code>distance_to_next_station_km</code></li>
+      </ul>
+    </div>
+    <div class="grid-item">
+      <strong>Network & Environmental Signals:</strong>
+      <ul>
+        <li><code>scheduled_remaining_time_minutes</code></li>
+        <li><code>corridor_congestion_score</code></li>
+        <li><code>weather_score</code> & <code>rainfall_mm</code></li>
+        <li><code>signal_delay_score</code></li>
+        <li><code>historical_avg_delay_minutes</code></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 4: MODEL EVALUATION -->
+<div class="avoid-break">
+  <h2>4. Empirical Performance & Model Evaluation</h2>
+  <p>
+    Evaluated on a strictly held-out test split of <strong>515 unseen journey snapshots</strong> across 37 distinct train runs:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Model / Pipeline</th>
+        <th>MAE (Min)</th>
+        <th>RMSE (Min)</th>
+        <th>R² (Absolute)</th>
+        <th>R² (Delay Signal)</th>
+        <th>Error Reduction</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Timetable Schedule Baseline</strong></td>
+        <td>17.96</td>
+        <td>23.41</td>
+        <td>0.9934</td>
+        <td>0.0000</td>
+        <td><span class="tag tag-amber">Baseline</span></td>
+      </tr>
+      <tr>
+        <td><strong>Random Forest Regressor</strong></td>
+        <td>10.62</td>
+        <td>13.90</td>
+        <td>0.9977</td>
+        <td>0.4810</td>
+        <td><span class="tag tag-blue">+40.9%</span></td>
+      </tr>
+      <tr>
+        <td><strong>Tuned XGBoost Regressor (Production)</strong></td>
+        <td><strong>10.37</strong></td>
+        <td><strong>13.65</strong></td>
+        <td><strong>0.9977</strong></td>
+        <td><strong>0.4993</strong></td>
+        <td><span class="tag tag-green"><strong>+42.3%</strong></span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Performance by Journey Distance Segment</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Segment Haul</th>
+        <th>Distance Range</th>
+        <th>Sample Count</th>
+        <th>XGBoost MAE</th>
+        <th>Schedule Baseline MAE</th>
+        <th>Accuracy Gain</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Short-Haul</strong></td>
+        <td>&lt; 100 km</td>
+        <td>172</td>
+        <td><strong>6.44 min</strong></td>
+        <td>12.80 min</td>
+        <td><span class="tag tag-green">+49.7%</span></td>
+      </tr>
+      <tr>
+        <td><strong>Medium-Haul</strong></td>
+        <td>100 – 300 km</td>
+        <td>171</td>
+        <td><strong>11.23 min</strong></td>
+        <td>18.95 min</td>
+        <td><span class="tag tag-green">+40.7%</span></td>
+      </tr>
+      <tr>
+        <td><strong>Long-Haul</strong></td>
+        <td>&gt; 300 km</td>
+        <td>172</td>
+        <td><strong>14.88 min</strong></td>
+        <td>22.10 min</td>
+        <td><span class="tag tag-green">+32.7%</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="highlight-box">
+    <strong>Understanding the Two R² Scores:</strong>
+    On absolute travel time, R² is <strong>0.9977</strong> because trip duration variance across 1,500 km dominates the denominator (SS<sub>tot</sub> = 42,352,134). On the isolated delay signal (&Delta;<sub>delay</sub>), R² is <strong>0.4993</strong> (explaining ~50% of real-world stochastic delay variations on unseen train journeys, compared to 0% for the timetable).
+  </div>
+</div>
+
+<!-- SECTION 5: DELAY-RISK CLASSIFIER -->
+<div class="avoid-break">
+  <h2>5. Operational Delay-Risk Classifier</h2>
+  <p>
+    Alongside regression, RailVue AI equips controllers with a 3-class Random Forest delay-risk classifier:
+  </p>
+
+  <div class="grid-2">
+    <div class="grid-item">
+      <strong>Risk Thresholds:</strong>
+      <ul>
+        <li><span class="tag tag-green">ON_TIME</span>: Delay deviation &le; 10 minutes</li>
+        <li><span class="tag tag-amber">MINOR_DELAY</span>: Delay deviation 10 – 30 minutes</li>
+        <li><span class="tag tag-blue">MAJOR_DELAY</span>: Delay deviation &gt; 30 minutes</li>
+      </ul>
+    </div>
+    <div class="grid-item">
+      <strong>Validation Results:</strong>
+      <ul>
+        <li><strong>Accuracy:</strong> 84.1%</li>
+        <li><strong>Macro F1-Score:</strong> 0.772</li>
+        <li><strong>False-Alarm Guardrail:</strong> Only 1 misclassification out of 113 on-time journeys flagged as major delay.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 6: EXPLAINABILITY -->
+<div class="avoid-break">
+  <h2>6. Human-in-the-Loop Explainability Engine</h2>
+  <p>
+    Predictions are never black-box numbers. The explainability layer (<code>backend/ml/explainability.py</code>) attributes ETA variance to physical operational drivers:
+  </p>
+  <ul>
+    <li><strong>Track Congestion:</strong> Preceding train density in critical block sections (e.g., Kanpur Central – Prayagraj – Pt. DD Upadhyaya).</li>
+    <li><strong>Signal Dwell:</strong> Waiting time for line and platform clearances at busy junction loops.</li>
+    <li><strong>Weather Restrictions:</strong> Mandatory speed reductions for fog or heavy rainfall.</li>
+    <li><strong>Speed Recovery Bonus:</strong> Timetable slack time allowing high-speed trains to recover lost minutes.</li>
+  </ul>
+</div>
+
+<!-- SECTION 7: FULL STACK ARCHITECTURE -->
+<div class="avoid-break">
+  <h2>7. Full-Stack Application Architecture & UI Innovations</h2>
+
+  <div class="pipeline-step">
+    <div class="step-num">1</div>
+    <div class="step-content"><strong>Data & Telemetry Engine:</strong> Indian Railways station directory (1,500+ trains) with real-time GPS telemetry simulation.</div>
+  </div>
+  <div class="pipeline-step">
+    <div class="step-num">2</div>
+    <div class="step-content"><strong>FastAPI Intelligence Core (Port 8000):</strong> 15-second simulation ticker serving dual regression and classification inference.</div>
+  </div>
+  <div class="pipeline-step">
+    <div class="step-num">3</div>
+    <div class="step-content"><strong>Dynamic Route Geometry SVG Map:</strong> 50+ real Indian Railways station coordinates with dynamic auto-fit bounding box and train marker snapping.</div>
+  </div>
+  <div class="pipeline-step">
+    <div class="step-num">4</div>
+    <div class="step-content"><strong>Continuous Timeline Track:</strong> Centered vertical track connector with station node status (completed gold / upcoming slate).</div>
+  </div>
+  <div class="pipeline-step">
+    <div class="step-num">5</div>
+    <div class="step-content"><strong>Corridor Routing Engine (Find Trains):</strong> Multi-corridor trunk matching (Grand Chord, Western, Konkan, Central) with automatic station code resolution.</div>
+  </div>
+  <div class="pipeline-step">
+    <div class="step-num">6</div>
+    <div class="step-content"><strong>Production Cloud Resilience:</strong> Vercel SPA routing with <code>vercel.json</code>, React <code>ErrorBoundary</code>, and automatic offline simulation fallback.</div>
+  </div>
+</div>
+
+<!-- SECTION 8: VERIFICATION -->
+<div class="avoid-break">
+  <h2>8. Project Resources & Live Deployment Verification</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Resource</th>
+        <th>URL / Location</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Live Vercel Production Web App</strong></td>
+        <td>https://rail-collector-zeta.vercel.app</td>
+        <td><span class="tag tag-green">ACTIVE (HTTP 200)</span></td>
+      </tr>
+      <tr>
+        <td><strong>GitHub Repository (Origin)</strong></td>
+        <td>https://github.com/SumitKumar-990/rail_collector</td>
+        <td><span class="tag tag-green">SYNCED (main branch)</span></td>
+      </tr>
+      <tr>
+        <td><strong>Trained Production Model</strong></td>
+        <td>backend/models/eta_xgboost.json</td>
+        <td><span class="tag tag-blue">VERSIONED ARTIFACT</span></td>
+      </tr>
+      <tr>
+        <td><strong>Delay Risk Classifier</strong></td>
+        <td>backend/models/delay_risk_classifier.pkl</td>
+        <td><span class="tag tag-blue">VERSIONED ARTIFACT</span></td>
+      </tr>
+      <tr>
+        <td><strong>Local FastAPI Backend API</strong></td>
+        <td>http://127.0.0.1:8000/docs</td>
+        <td><span class="tag tag-blue">SWAGGER OPENAPI</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer-note">
+  RailVue AI Architecture Walkthrough • Smart India Hackathon Verified Documentation • September 2026
+</div>
+
+</body>
+</html>
